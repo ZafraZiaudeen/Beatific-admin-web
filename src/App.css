@@ -1,0 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+/* Base Styles */
+body { font-family: 'DM Sans', sans-serif; -webkit-font-smoothing: antialiased; }
+.serif-font { font-family: 'Playfair Display', serif; }
+
+/* Utilities */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Canvas Pattern */
+.canvas-bg {
+	background-color: #f5f5f4;
+	background-image: radial-gradient(#d6d3d1 1px, transparent 1px);
+	background-size: 20px 20px;
+}
+
+/* Small helpers for view toggling */
+.view-section { display: flex; }
+

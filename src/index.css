@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Custom global styles can go here */
+html, body, #root {
+	height: 100%;
+}
