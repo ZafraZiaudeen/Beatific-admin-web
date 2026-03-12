@@ -18,8 +18,9 @@ import { v4 as uuidv4 } from 'uuid'
 import { useEditor } from '../../context/useEditor'
 import type { CanvasElement, Tool } from '../../types/editor'
 
-function getCursor(tool: Tool): string {
+function getCursor(tool: Tool, isPanning: boolean): string {
   switch (tool) {
+    case 'pan':      return isPanning ? 'grabbing' : 'grab'
     case 'text':     return 'text'
     case 'rect':
     case 'circle':
@@ -246,6 +247,18 @@ export default function KonvaEditor() {
   const transformerRef = useRef<Konva.Transformer>(null)
   const drawingRef     = useRef<{ id: string; startX: number; startY: number; points?: number[] } | null>(null)
   const penPathRef     = useRef<string>('')
+  const panRef         = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null)
+  const [isPanning, setIsPanning] = useState(false)
+
+  const getScrollParent = useCallback(() => {
+    let el: HTMLElement | null = (stageRef.current as Konva.Stage)?.container()
+    while (el) {
+      const { overflow, overflowX, overflowY } = window.getComputedStyle(el)
+      if (/auto|scroll/.test(overflow + overflowX + overflowY)) return el
+      el = el.parentElement
+    }
+    return null
+  }, [stageRef])
 
   useEffect(() => {
     const tr = transformerRef.current
@@ -274,6 +287,18 @@ export default function KonvaEditor() {
 
   const handleMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (activeTool === 'pan') {
+        const scroller = getScrollParent()
+        panRef.current = {
+          startX: e.evt.clientX,
+          startY: e.evt.clientY,
+          scrollLeft: scroller?.scrollLeft ?? 0,
+          scrollTop:  scroller?.scrollTop  ?? 0,
+        }
+        setIsPanning(true)
+        return
+      }
+
       if (activeTool === 'select') {
         if (e.target === (stageRef.current as Konva.Stage)) select(null)
         return
@@ -324,11 +349,21 @@ export default function KonvaEditor() {
         addElement({ id, type: 'arrow', x: 0, y: 0, points: [x, y, x, y], stroke: '#1a1a1a', strokeWidth: 2, fill: '#1a1a1a', opacity: 1 })
       }
     },
-    [activeTool, addElement, select, stageRef, getPos]
+    [activeTool, addElement, select, stageRef, getPos, getScrollParent]
   )
 
   const handleMouseMove = useCallback(
-    () => {
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (activeTool === 'pan') {
+        if (!panRef.current) return
+        const scroller = getScrollParent()
+        if (!scroller) return
+        const dx = e.evt.clientX - panRef.current.startX
+        const dy = e.evt.clientY - panRef.current.startY
+        scroller.scrollLeft = panRef.current.scrollLeft - dx
+        scroller.scrollTop  = panRef.current.scrollTop  - dy
+        return
+      }
       if (!drawingRef.current) return
       const { x, y } = getPos()
       const { id, startX, startY } = drawingRef.current
@@ -364,12 +399,14 @@ export default function KonvaEditor() {
         updateElement(id, { points: [startX, startY, x, y] })
       }
     },
-    [activeTool, updateElement, getPos]
+    [activeTool, updateElement, getPos, getScrollParent]
   )
 
   const handleMouseUp = useCallback(() => {
     drawingRef.current = null
     penPathRef.current = ''
+    panRef.current = null
+    setIsPanning(false)
   }, [])
 
   const handleDblClick = useCallback(
@@ -473,7 +510,7 @@ export default function KonvaEditor() {
   return (
     <div
       className="relative select-none"
-      style={{ cursor: getCursor(activeTool), width: canvasW * zoom, height: canvasH * zoom }}
+      style={{ cursor: getCursor(activeTool, isPanning), width: canvasW * zoom, height: canvasH * zoom }}
     >
       {/* Hidden file input for image import */}
       <input

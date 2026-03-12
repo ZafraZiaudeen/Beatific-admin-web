@@ -4,10 +4,16 @@ import type { DocumentType, EditorState, Page, Tool, CanvasElement } from '../ty
 import { EditorContext } from './EditorContextDef'
 import type { Action } from './EditorContextDef'
 
-const TEMPLATE_W = 595   
-const TEMPLATE_H = 842
-const STICKER_W  = 400
-const STICKER_H  = 400
+const DEFAULT_W = 595  
+const DEFAULT_H = 842 
+const SQUARE_W  = 400   
+const SQUARE_H  = 400
+
+function defaultCanvasSize(docType: string): { w: number; h: number } {
+  const squareTypes = new Set(['sticker', 'stickers', 'icon', 'icons', 'badge', 'badges'])
+  if (squareTypes.has(docType.toLowerCase())) return { w: SQUARE_W, h: SQUARE_H }
+  return { w: DEFAULT_W, h: DEFAULT_H }
+}
 
 function makeBlankPage(name: string, w: number, h: number): Page {
   return { id: uuidv4(), name, elements: [], background: '#ffffff', width: w, height: h }
@@ -36,14 +42,25 @@ function reducer(state: EditorState, action: Action): EditorState {
 
     case 'ADD_PAGE': {
       const { pages } = state
-      const w = pages[0]?.width  ?? TEMPLATE_W
-      const h = pages[0]?.height ?? TEMPLATE_H
+      const w = pages[0]?.width  ?? DEFAULT_W
+      const h = pages[0]?.height ?? DEFAULT_H
       const newPage = makeBlankPage(`Page ${pages.length + 1}`, w, h)
       const newPages = [...pages, newPage]
       return {
         ...state,
         pages: newPages,
         currentPageIndex: newPages.length - 1,
+        selectedId: null,
+        ...pushHistory(state),
+      }
+    }
+
+    case 'LOAD_PAGES': {
+      const merged = [...state.pages, ...action.pages]
+      return {
+        ...state,
+        pages: merged,
+        currentPageIndex: state.pages.length,   
         selectedId: null,
         ...pushHistory(state),
       }
@@ -146,8 +163,9 @@ function reducer(state: EditorState, action: Action): EditorState {
       if (action.direction === 'bottom') target = 0
       const [el] = els.splice(idx, 1)
       els.splice(target, 0, el)
+      const reindexed = els.map((e, i) => ({ ...e, zIndex: i }))
       const pages = state.pages.map((p, i) =>
-        i === state.currentPageIndex ? { ...p, elements: els } : p
+        i === state.currentPageIndex ? { ...p, elements: reindexed } : p
       )
       return { ...state, pages }
     }
@@ -163,8 +181,7 @@ function reducer(state: EditorState, action: Action): EditorState {
       return { ...state, documentName: action.name }
 
     case 'SET_DOC_TYPE': {
-      const w = action.docType === 'sticker' ? STICKER_W : TEMPLATE_W
-      const h = action.docType === 'sticker' ? STICKER_H : TEMPLATE_H
+      const { w, h } = defaultCanvasSize(action.docType)
       const pages = state.pages.map(p => ({ ...p, width: w, height: h }))
       return { ...state, documentType: action.docType, pages }
     }
@@ -201,8 +218,7 @@ export function EditorProvider({
   initial?: { name?: string; type?: DocumentType; pages?: Page[] }
 }) {
   const docType: DocumentType = initial?.type ?? 'template'
-  const w = docType === 'sticker' ? STICKER_W : TEMPLATE_W
-  const h = docType === 'sticker' ? STICKER_H : TEMPLATE_H
+  const { w, h } = defaultCanvasSize(docType)
 
   const coverPage = makeBlankPage('Cover', w, h)
   const startPages: Page[] = (initial?.pages && initial.pages.length > 0)
@@ -222,6 +238,7 @@ export function EditorProvider({
   }
 
   const [state, dispatch] = useReducer(reducer, initialState)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stageRef = useRef<any>(null)
 
   const currentPage = state.pages[state.currentPageIndex]
@@ -247,6 +264,8 @@ export function EditorProvider({
   const setBackground = useCallback((color: string) => dispatch({ type: 'SET_BG', color }), [])
   const reorderElement = useCallback((id: string, dir: 'up' | 'down' | 'top' | 'bottom') =>
     dispatch({ type: 'REORDER_ELEMENT', id, direction: dir }), [])
+  const loadPages = useCallback((pages: Page[]) =>
+    dispatch({ type: 'LOAD_PAGES', pages }), [])
 
   return (
     <EditorContext.Provider
@@ -270,6 +289,7 @@ export function EditorProvider({
         setDocType,
         setBackground,
         reorderElement,
+        loadPages,
         stageRef,
       }}
     >

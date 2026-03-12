@@ -1,26 +1,29 @@
 import React from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 
 type Props = {
   onLogout?: () => void
 }
 
-const viewLabels: Record<string, string> = {
-  '/dashboard':        'Overview',
-  '/templates':        'Templates',
-  '/stickers':         'Stickers',
-  '/templates/editor': 'Editor',
-  '/stickers/editor':  'Editor',
-}
-
-function getLabel(pathname: string): string {
-  if (pathname.startsWith('/templates/editor')) return 'Editor'
-  if (pathname.startsWith('/stickers/editor'))  return 'Editor'
-  return viewLabels[pathname] ?? pathname.replace('/', '')
+function getLabel(pathname: string, searchParams: URLSearchParams): string {
+  if (pathname === '/dashboard')           return 'Overview'
+  if (pathname.startsWith('/content/editor')) return 'Editor'
+  if (pathname === '/content') {
+    const type = searchParams.get('type')
+    if (type) {
+      const formatted = type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+      return formatted.endsWith('s') ? formatted : formatted + 's'
+    }
+    return 'Content'
+  }
+  if (pathname.startsWith('/templates')) return 'Editor'
+  if (pathname.startsWith('/stickers'))  return 'Editor'
+  return pathname.replace(/^\//, '').replace(/-/g, ' ')
 }
 
 export default function HeaderBar({ onLogout }: Props) {
   const { pathname } = useLocation()
+  const [searchParams] = useSearchParams()
   return (
     <header className="h-12 bg-white border-b border-stone-200 flex items-center justify-between px-6 shrink-0 z-10">
       <div className="flex items-center gap-1.5 text-sm text-stone-500">
@@ -28,7 +31,7 @@ export default function HeaderBar({ onLogout }: Props) {
           <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
         </svg>
         <span className="text-stone-400">›</span>
-        <span className="text-stone-800 font-medium">{getLabel(pathname)}</span>
+        <span className="text-stone-800 font-medium capitalize">{getLabel(pathname, searchParams)}</span>
       </div>
       <div className="flex items-center gap-3">
         <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors">
@@ -46,4 +49,3 @@ export default function HeaderBar({ onLogout }: Props) {
     </header>
   )
 }
-

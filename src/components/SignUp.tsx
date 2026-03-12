@@ -24,7 +24,6 @@ export default function SignUp() {
   }
   return (
     <div className="w-full h-full bg-white relative flex">
-      {/* Left Side: Branding + Pink Animation */}
       <div className="hidden lg:flex flex-col overflow-hidden bg-[#F5F2EF] w-1/2 h-full border-r border-stone-200 pt-12 pr-12 pb-12 pl-12 relative justify-between">
         <div className="z-10">
           <div className="flex items-center gap-2 mb-6">
@@ -41,9 +40,7 @@ export default function SignUp() {
           </p>
         </div>
 
-        {/* Pink blur animation */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-rose-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse pointer-events-none" />
-        {/* Bottom gradient */}
         <div className="absolute bottom-0 right-0 w-full h-1/2 bg-linear-to-t from-stone-100 to-transparent pointer-events-none" />
 
         <div className="z-10 flex gap-4 text-xs font-medium text-stone-400">
@@ -53,7 +50,6 @@ export default function SignUp() {
         </div>
       </div>
 
-      {/* Right Side: Sign Up Form */}
       <div className="w-full lg:w-1/2 h-full flex items-center justify-center p-8">
         <div className="w-full max-w-sm space-y-8">
           <div className="text-center">

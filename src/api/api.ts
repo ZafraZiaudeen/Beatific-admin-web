@@ -3,14 +3,12 @@ import type { AxiosRequestConfig, AxiosResponse, Method } from 'axios'
 import { getPersistedToken, clearPersistedAuth } from '@/utils/persistedAuth'
 
 const envBase = import.meta.env.VITE_API_BASE_URL
-const defaultBase = 'http://localhost:3002'
+const defaultBase = 'http://localhost:3002/api/v1'
 const baseURL = envBase ? envBase.replace(/\/+$/, '') : defaultBase
 
 const axiosInstance = axios.create({
   baseURL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  // Don't set default Content-Type - we handle it per request
 })
 
 export const setAuthToken = (token: string | null): void => {
@@ -26,6 +24,10 @@ axiosInstance.interceptors.request.use(
     const token = getPersistedToken()
     if (token && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`
+    }
+    // Set Content-Type only for non-FormData requests
+    if (!(config.data instanceof FormData)) {
+      config.headers['Content-Type'] = 'application/json'
     }
     return config
   },
@@ -69,11 +71,15 @@ export const request = async <TResponse, TBody = unknown>(
     url,
     method,
     params,
-    headers,
+    headers: { ...headers },
   }
 
   if (data !== undefined) {
     config.data = data
+    // For FormData, don't set Content-Type - let axios set it with boundary
+    if (data instanceof FormData) {
+      delete config.headers['Content-Type']
+    }
   }
 
   if (publicApi) {

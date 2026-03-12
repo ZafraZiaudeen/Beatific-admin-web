@@ -12,6 +12,7 @@ export type Action =
   | { type: 'SET_TOOL'; tool: Tool }
   | { type: 'SELECT'; id: string | null }
   | { type: 'ADD_PAGE' }
+  | { type: 'LOAD_PAGES'; pages: Page[] }
   | { type: 'DELETE_PAGE'; pageId: string }
   | { type: 'RENAME_PAGE'; pageId: string; name: string }
   | { type: 'SET_PAGE'; index: number }
@@ -47,6 +48,7 @@ export interface EditorContextValue {
   setDocType: (t: DocumentType) => void
   setBackground: (color: string) => void
   reorderElement: (id: string, dir: 'up' | 'down' | 'top' | 'bottom') => void
+  loadPages: (pages: Page[]) => void
   stageRef: RefObject<any> // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 

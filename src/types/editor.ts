@@ -1,5 +1,6 @@
 export type Tool =
   | 'select'
+  | 'pan'
   | 'text'
   | 'rect'
   | 'circle'
@@ -13,7 +14,7 @@ export type Tool =
   | 'image'
   | 'pen'
 
-export type DocumentType = 'template' | 'sticker'
+export type DocumentType = string
 
 export interface CanvasElement {
   id: string

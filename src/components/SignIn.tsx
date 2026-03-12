@@ -24,7 +24,6 @@ export default function SignIn() {
 
   return (
     <div className="w-full h-full bg-white relative flex">
-      {/* Left Side: Branding + Pink Animation */}
       <div className="hidden lg:flex flex-col overflow-hidden bg-[#F5F2EF] w-1/2 h-full border-r border-stone-200 pt-12 pr-12 pb-12 pl-12 relative justify-between">
         <div className="z-10">
           <div className="flex items-center gap-2 mb-6">
@@ -53,7 +52,6 @@ export default function SignIn() {
         </div>
       </div>
 
-      {/* Right Side: Sign In Form */}
       <div className="w-full lg:w-1/2 h-full flex items-center justify-center p-8">
         <div className="w-full max-w-sm space-y-8">
           <div className="text-center">
