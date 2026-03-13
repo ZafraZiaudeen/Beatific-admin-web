@@ -8,6 +8,8 @@ interface BackendAuthResponse {
   email: string
   role: string
   token: string
+  bio?: string
+  avatar?: string
 }
 
 interface BackendProfileResponse {
@@ -16,6 +18,8 @@ interface BackendProfileResponse {
   name: string
   email: string
   role: string
+  bio?: string
+  avatar?: string
 }
 
 const AuthApi = {
@@ -34,6 +38,8 @@ const AuthApi = {
         name: response.name,
         email: response.email,
         role: response.role,
+        bio: response.bio,
+        avatar: response.avatar,
       },
       token: response.token,
     }
@@ -54,6 +60,8 @@ const AuthApi = {
         name: response.name,
         email: response.email,
         role: response.role,
+        bio: response.bio,
+        avatar: response.avatar,
       },
       token: response.token,
     }
@@ -72,6 +80,8 @@ const AuthApi = {
         name: response.name,
         email: response.email,
         role: response.role,
+        bio: response.bio,
+        avatar: response.avatar,
       },
       token: '',
     }

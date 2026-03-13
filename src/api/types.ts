@@ -4,6 +4,8 @@ export interface AdminUser {
   name: string
   email: string
   role: string
+  bio?: string
+  avatar?: string
 }
 
 export interface AuthState {
