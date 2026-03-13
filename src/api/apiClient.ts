@@ -3,7 +3,6 @@ import Api from './api'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ApiData = any
 
-// ── Unified Content API (NEW) ────────────────────────────
 export const contentApi = {
   list: (params?: { itemType?: string; search?: string; category?: string; subcategory?: string }) => {
     const q = new URLSearchParams()
@@ -50,7 +49,6 @@ export const contentApi = {
     Api.request<ApiData>({ url: '/content/stats', method: 'GET' }),
 }
 
-// ── Media Upload API ─────────────────────────────────────
 export const mediaApi = {
   upload: (file: File) => {
     const form = new FormData()
@@ -59,7 +57,6 @@ export const mediaApi = {
   },
 }
 
-// ── Legacy APIs (DEPRECATED - use contentApi) ────────────
 export const templateApi = {
   list: (params?: { search?: string; category?: string; subcategory?: string }) => {
     const q = new URLSearchParams()
@@ -222,12 +219,10 @@ export const pdfApi = {
       url:     '/pdf/decompose',
       method:  'POST',
       data:    form,
-      // Don't set Content-Type - let axios set it with the boundary for FormData
     })
   },
 }
 
-// ── Permission Management API ────────────────────────────
 export const permissionApi = {
   list: (scope?: string) =>
     Api.request<ApiData>({
@@ -265,9 +260,150 @@ export const permissionApi = {
     Api.request<ApiData>({ url: `/permissions/${scope}/${targetType}`, method: 'DELETE' }),
 }
 
-// ── User Management API ──────────────────────────────────
+type SettingsPayload = {
+  appName: string
+  appDescription: string
+  supportEmail: string
+  contactUrl: string
+  maintenanceMode: boolean
+  maintenanceMessage: string
+  allowNewRegistrations: boolean
+  sessionTimeoutHours: number
+  maxLoginAttempts: number
+  requireStrongPassword: boolean
+  enableEmailNotifications: boolean
+  notifyOnNewUser: boolean
+  notifyOnContentPublish: boolean
+  notifyOnLogin: boolean
+  // Verification & rate-limit settings
+  verificationCodeExpiry: number
+  maxCodeVerifyAttempts: number
+  maxCodeResendAttempts: number
+  codeResendCooldown: number
+  codeSessionResetTime: number
+  maxForgotPasswordAttempts: number
+  forgotPasswordWindowMinutes: number
+}
+
+type SettingsEnvelope = {
+  success: boolean
+  data: SettingsPayload
+}
+
+type SettingsMessageEnvelope = {
+  success: boolean
+  message: string
+  data?: SettingsPayload
+}
+
+export const settingsApi = {
+  get: async () => {
+    const res = await Api.request<SettingsEnvelope>({ url: '/settings', method: 'GET' })
+    return res.data
+  },
+
+  updateGeneral: async (body: {
+    appName?: string
+    appDescription?: string
+    supportEmail?: string
+    contactUrl?: string
+    maintenanceMode?: boolean
+    maintenanceMessage?: string
+    allowNewRegistrations?: boolean
+  }) => {
+    const res = await Api.request<SettingsEnvelope, typeof body>({
+      url: '/settings/general',
+      method: 'PUT',
+      data: body,
+    })
+    return res.data
+  },
+
+  updateSecurity: async (body: {
+    sessionTimeoutHours?: number
+    maxLoginAttempts?: number
+    requireStrongPassword?: boolean
+  }) => {
+    const res = await Api.request<SettingsEnvelope, typeof body>({
+      url: '/settings/security',
+      method: 'PUT',
+      data: body,
+    })
+    return res.data
+  },
+
+  updateVerification: async (body: {
+    verificationCodeExpiry?: number
+    maxCodeVerifyAttempts?: number
+    maxCodeResendAttempts?: number
+    codeResendCooldown?: number
+    codeSessionResetTime?: number
+    maxForgotPasswordAttempts?: number
+    forgotPasswordWindowMinutes?: number
+  }) => {
+    const res = await Api.request<SettingsEnvelope, typeof body>({
+      url: '/settings/verification',
+      method: 'PUT',
+      data: body,
+    })
+    return res.data
+  },
+
+  updateNotifications: async (body: {
+    enableEmailNotifications?: boolean
+    notifyOnNewUser?: boolean
+    notifyOnContentPublish?: boolean
+    notifyOnLogin?: boolean
+  }) => {
+    const res = await Api.request<SettingsEnvelope, typeof body>({
+      url: '/settings/notifications',
+      method: 'PUT',
+      data: body,
+    })
+    return res.data
+  },
+
+  dangerAction: async (action: 'flush-sessions' | 'ban-all-users' | 'reset') => {
+    const res = await Api.request<SettingsMessageEnvelope>({
+      url: `/settings/${action}`,
+      method: 'POST',
+    })
+    return res
+  },
+
+  testEmail: async () => {
+    const res = await Api.request<SettingsMessageEnvelope>({
+      url: '/settings/test-email',
+      method: 'POST',
+    })
+    return res
+  },
+
+  testNotification: async (type: 'new-user' | 'content-published' | 'admin-login') => {
+    const res = await Api.request<SettingsMessageEnvelope, { type: string }>({
+      url: '/settings/test-notification',
+      method: 'POST',
+      data: { type },
+    })
+    return res
+  },
+}
+
+export const profileApi = {
+  updateProfile: (body: { name?: string; email?: string; avatar?: string; bio?: string }) =>
+    Api.request<ApiData>({ url: '/auth/profile', method: 'PUT', data: body }),
+
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    Api.request<ApiData>({ url: '/auth/change-password', method: 'PUT', data: body }),
+
+  uploadAvatar: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return Api.request<ApiData>({ url: '/media/upload', method: 'POST', data: form })
+  },
+}
+
 export const userApi = {
-  // Admin users
   listAdminUsers: (params?: { page?: number; limit?: number; search?: string }) => {
     const q = new URLSearchParams()
     if (params?.page)   q.set('page',   String(params.page))
