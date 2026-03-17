@@ -1,5 +1,6 @@
 import Api from './api'
 import type { LoginCredentials, RegisterCredentials, LoginResponse } from './types'
+import { isAdminRole } from '@/constants'
 
 interface BackendAuthResponse {
   success: boolean
@@ -22,6 +23,8 @@ interface BackendProfileResponse {
   avatar?: string
 }
 
+const toAdminRole = (role: string) => (isAdminRole(role) ? role : 'editor')
+
 const AuthApi = {
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
     const response = await Api.request<BackendAuthResponse, LoginCredentials>({
@@ -37,7 +40,7 @@ const AuthApi = {
         _id: response._id,
         name: response.name,
         email: response.email,
-        role: response.role,
+        role: toAdminRole(response.role),
         bio: response.bio,
         avatar: response.avatar,
       },
@@ -59,7 +62,7 @@ const AuthApi = {
         _id: response._id,
         name: response.name,
         email: response.email,
-        role: response.role,
+        role: toAdminRole(response.role),
         bio: response.bio,
         avatar: response.avatar,
       },
@@ -79,7 +82,7 @@ const AuthApi = {
         _id: response._id,
         name: response.name,
         email: response.email,
-        role: response.role,
+        role: toAdminRole(response.role),
         bio: response.bio,
         avatar: response.avatar,
       },

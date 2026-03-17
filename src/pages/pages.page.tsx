@@ -1,20 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { contentApi } from '../api/apiClient'
+import { useAppDispatch, useAppSelector } from '../api/hooks'
+import { fetchContent, deleteContent, toggleContentPublish } from '../actions/contentAction'
+import type { ContentItem } from '../api/types'
 
-interface PageItem {
-  _id: string
-  name: string
-  itemType: string
-  category?: string
-  subcategory?: string
-  isPublished: boolean
-  pages: { background?: string; elements?: unknown[]; width?: number; height?: number }[]
-  createdAt: string
-  updatedAt: string
-}
-
-function Thumbnail({ page }: { page: PageItem['pages'][0] | undefined }) {
+function Thumbnail({ page }: { page: { background?: string; elements?: unknown[] } | undefined }) {
   const bg = page?.background ?? '#ffffff'
   const elemCount = page?.elements?.length ?? 0
   const isTransparent = bg === 'transparent'
@@ -45,26 +35,13 @@ function Thumbnail({ page }: { page: PageItem['pages'][0] | undefined }) {
 
 export default function PagesPage() {
   const navigate = useNavigate()
-  const [items, setItems] = useState<PageItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const dispatch = useAppDispatch()
+  const { items, loading, deleting, togglingId, error } = useAppSelector(s => s.content)
   const [search, setSearch] = useState('')
-  const [deleting, setDeleting] = useState<string | null>(null)
-  const [togglingId, setTogglingId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async (q?: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await contentApi.list({ itemType: 'page', search: q })
-      setItems((res.data ?? []) as PageItem[])
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to load pages')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const load = useCallback((q?: string) => {
+    dispatch(fetchContent({ itemType: 'page', search: q }))
+  }, [dispatch])
 
   useEffect(() => { void load() }, [load])
 
@@ -72,28 +49,18 @@ export default function PagesPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this page?')) return
-    setDeleting(id)
     try {
-      await contentApi.delete(id)
-      setItems(prev => prev.filter(i => i._id !== id))
+      await dispatch(deleteContent(id)).unwrap()
     } catch {
       alert('Failed to delete')
-    } finally {
-      setDeleting(null)
     }
   }
 
-  const handleTogglePublish = async (id: string, current: boolean) => {
-    setTogglingId(id)
+  const handleTogglePublish = async (item: ContentItem) => {
     try {
-      const res = await contentApi.publish(id, !current)
-      setItems(prev =>
-        prev.map(i => (i._id === id ? { ...i, isPublished: res.data?.isPublished ?? !current } : i))
-      )
+      await dispatch(toggleContentPublish({ id: item._id, isPublished: !item.isPublished })).unwrap()
     } catch {
       alert('Failed to update')
-    } finally {
-      setTogglingId(null)
     }
   }
 
@@ -190,14 +157,14 @@ export default function PagesPage() {
               onClick={() => navigate(`/pages/editor/${item._id}`)}
             >
               <div className="aspect-3/4 relative">
-                <Thumbnail page={item.pages[0]} />
+                <Thumbnail page={(item.pages as Array<{ background?: string; elements?: unknown[] }>)[0]} />
                 {/* Overlay buttons */}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={e => {
                       e.stopPropagation()
-                      handleTogglePublish(item._id, item.isPublished)
+                      handleTogglePublish(item)
                     }}
                     disabled={togglingId === item._id}
                     className={`p-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors ${

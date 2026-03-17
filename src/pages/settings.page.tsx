@@ -1,7 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppSelector, useAppDispatch } from '../api/hooks'
 import { fetchUserProfile } from '../actions/authAction'
-import { settingsApi, profileApi } from '../api/apiClient'
+import {
+  fetchSettings, updateGeneralSettings, updateSecuritySettings,
+  updateVerificationSettings, updateNotificationSettings,
+  executeDangerAction, sendTestEmail, sendTestNotification
+} from '../actions/settingsAction'
+import {
+  updateAdminProfile, changeAdminPassword, uploadAdminAvatar
+} from '../actions/profileAction'
+import { setToast, clearToast } from '../slices/uiSlice'
 import {
   apiMsg, Toggle, SettingRow, SectionCard, SaveBar,
   PasswordStrength, EyeIcon, EyeOffIcon, Toast,
@@ -18,7 +26,7 @@ interface AppSettings {
   maxForgotPasswordAttempts: number; forgotPasswordWindowMinutes: number
 }
 type Tab = 'profile' | 'general' | 'security' | 'verification' | 'notifications' | 'danger'
-interface ToastState { msg: string; type: 'success' | 'error' | 'info' }
+interface ToastState { msg: string; type: 'success' | 'error' | 'info' | 'warning' }
 
 // ─── ProfileTab ───────────────────────────────────────────
 function ProfileTab({ user }: { user: { name: string; email: string; role: string; avatar?: string; bio?: string } | null }) {
@@ -44,8 +52,8 @@ function ProfileTab({ user }: { user: { name: string; email: string; role: strin
     const file = e.target.files?.[0]; if (!file) return
     setUploadingAvatar(true)
     try {
-      const res = await profileApi.uploadAvatar(file)
-      const url: string = res.data?.url ?? res.url ?? ''
+      const res = await dispatch(uploadAdminAvatar(file)).unwrap()
+      const url: string = typeof res === 'string' ? res : (res as any)?.url ?? ''
       if (url) { setAvatar(url); setProfSaved(false) }
     } catch (err) { setProfError(apiMsg(err, 'Failed to upload image')) }
     finally { setUploadingAvatar(false) }
@@ -54,7 +62,7 @@ function ProfileTab({ user }: { user: { name: string; email: string; role: strin
   const handleSaveProfile = async () => {
     setProfSaving(true); setProfError(null)
     try {
-      await profileApi.updateProfile({ name: name.trim(), email: email.trim(), bio: bio.trim(), avatar })
+      await dispatch(updateAdminProfile({ name: name.trim(), email: email.trim(), bio: bio.trim(), avatar })).unwrap()
       setProfSaved(true); setTimeout(() => setProfSaved(false), 3000)
       void dispatch(fetchUserProfile())
     } catch (err) { setProfError(apiMsg(err, 'Failed to update profile')) }
@@ -67,7 +75,7 @@ function ProfileTab({ user }: { user: { name: string; email: string; role: strin
     if (newPw.length < 6) { setPwError('Password must be at least 6 characters'); return }
     setPwSaving(true); setPwError(null)
     try {
-      await profileApi.changePassword({ currentPassword: currentPw, newPassword: newPw })
+      await dispatch(changeAdminPassword({ currentPassword: currentPw, newPassword: newPw })).unwrap()
       setPwSaved(true); setCurrentPw(''); setNewPw(''); setConfirmPw('')
       setTimeout(() => setPwSaved(false), 3000)
     } catch (err) { setPwError(apiMsg(err, 'Failed to change password')) }
@@ -193,6 +201,7 @@ function ProfileTab({ user }: { user: { name: string; email: string; role: strin
 
 // ─── GeneralTab ───────────────────────────────────────────
 function GeneralTab({ settings, onRefresh }: { settings: AppSettings | null; onRefresh: () => void }) {
+  const dispatch = useAppDispatch()
   const [appName, setAppName]           = useState(settings?.appName ?? '')
   const [appDesc, setAppDesc]           = useState(settings?.appDescription ?? '')
   const [supportEmail, setSupportEmail] = useState(settings?.supportEmail ?? '')
@@ -226,7 +235,7 @@ function GeneralTab({ settings, onRefresh }: { settings: AppSettings | null; onR
   const handleSave = async () => {
     setSaving(true); setError(null)
     try {
-      await settingsApi.updateGeneral({ appName, appDescription: appDesc, supportEmail, contactUrl, maintenanceMode: maintenance, maintenanceMessage: maintMsg, allowNewRegistrations: allowReg })
+      await dispatch(updateGeneralSettings({ appName, appDescription: appDesc, supportEmail, contactUrl, maintenanceMode: maintenance, maintenanceMessage: maintMsg, allowNewRegistrations: allowReg })).unwrap()
       setSaved(true); setTimeout(() => setSaved(false), 3000); onRefresh()
     } catch (err) { setError(apiMsg(err)) } finally { setSaving(false) }
   }
@@ -285,6 +294,7 @@ function GeneralTab({ settings, onRefresh }: { settings: AppSettings | null; onR
 
 // ─── SecurityTab ──────────────────────────────────────────
 function SecurityTab({ settings, onRefresh }: { settings: AppSettings | null; onRefresh: () => void }) {
+  const dispatch = useAppDispatch()
   const [sessionHours, setSessionHours] = useState(settings?.sessionTimeoutHours ?? 168)
   const [maxAttempts, setMaxAttempts]   = useState(settings?.maxLoginAttempts ?? 10)
   const [strongPw, setStrongPw]         = useState(settings?.requireStrongPassword ?? false)
@@ -301,7 +311,7 @@ function SecurityTab({ settings, onRefresh }: { settings: AppSettings | null; on
   const handleSave = async () => {
     setSaving(true); setError(null)
     try {
-      await settingsApi.updateSecurity({ sessionTimeoutHours: sessionHours, maxLoginAttempts: maxAttempts, requireStrongPassword: strongPw })
+      await dispatch(updateSecuritySettings({ sessionTimeoutHours: sessionHours, maxLoginAttempts: maxAttempts, requireStrongPassword: strongPw })).unwrap()
       setSaved(true); setTimeout(() => setSaved(false), 3000); onRefresh()
     } catch (err) { setError(apiMsg(err)) } finally { setSaving(false) }
   }
@@ -358,6 +368,7 @@ function SecurityTab({ settings, onRefresh }: { settings: AppSettings | null; on
 
 // ─── VerificationTab ──────────────────────────────────────
 function VerificationTab({ settings, onRefresh }: { settings: AppSettings | null; onRefresh: () => void }) {
+  const dispatch = useAppDispatch()
   const [codeExpiry, setCodeExpiry]         = useState(settings?.verificationCodeExpiry ?? 10)
   const [maxVerify, setMaxVerify]           = useState(settings?.maxCodeVerifyAttempts ?? 5)
   const [maxResend, setMaxResend]           = useState(settings?.maxCodeResendAttempts ?? 3)
@@ -392,7 +403,7 @@ function VerificationTab({ settings, onRefresh }: { settings: AppSettings | null
   const handleSave = async () => {
     setSaving(true); setError(null)
     try {
-      await settingsApi.updateVerification({
+      await dispatch(updateVerificationSettings({
         verificationCodeExpiry: codeExpiry,
         maxCodeVerifyAttempts: maxVerify,
         maxCodeResendAttempts: maxResend,
@@ -400,7 +411,7 @@ function VerificationTab({ settings, onRefresh }: { settings: AppSettings | null
         codeSessionResetTime: sessionReset,
         maxForgotPasswordAttempts: maxForgot,
         forgotPasswordWindowMinutes: forgotWindow,
-      })
+      })).unwrap()
       setSaved(true); setTimeout(() => setSaved(false), 3000); onRefresh()
     } catch (err) { setError(apiMsg(err)) } finally { setSaving(false) }
   }
@@ -486,6 +497,7 @@ function VerificationTab({ settings, onRefresh }: { settings: AppSettings | null
 
 // ─── NotificationsTab ─────────────────────────────────────
 function NotificationsTab({ settings, onRefresh }: { settings: AppSettings | null; onRefresh: () => void }) {
+  const dispatch = useAppDispatch()
   const [emailEnabled, setEmailEnabled] = useState(settings?.enableEmailNotifications ?? false)
   const [onNewUser, setOnNewUser]       = useState(settings?.notifyOnNewUser ?? true)
   const [onPublish, setOnPublish]       = useState(settings?.notifyOnContentPublish ?? false)
@@ -506,7 +518,7 @@ function NotificationsTab({ settings, onRefresh }: { settings: AppSettings | nul
   const handleSave = async () => {
     setSaving(true); setError(null)
     try {
-      await settingsApi.updateNotifications({ enableEmailNotifications: emailEnabled, notifyOnNewUser: onNewUser, notifyOnContentPublish: onPublish, notifyOnLogin: onLogin })
+      await dispatch(updateNotificationSettings({ enableEmailNotifications: emailEnabled, notifyOnNewUser: onNewUser, notifyOnContentPublish: onPublish, notifyOnLogin: onLogin })).unwrap()
       setSaved(true); setTimeout(() => setSaved(false), 3000); onRefresh()
     } catch (err) { setError(apiMsg(err)) } finally { setSaving(false) }
   }
@@ -514,7 +526,7 @@ function NotificationsTab({ settings, onRefresh }: { settings: AppSettings | nul
   const handleTestTrigger = async (type: 'new-user' | 'content-published' | 'admin-login') => {
     setTestingTrigger(type); setError(null)
     try {
-      await settingsApi.testNotification(type)
+      await dispatch(sendTestNotification(type)).unwrap()
       setSaved(true); setTimeout(() => setSaved(false), 3000)
     } catch (err) {
       setError(apiMsg(err, 'Failed to send test notification'))
@@ -526,11 +538,11 @@ function NotificationsTab({ settings, onRefresh }: { settings: AppSettings | nul
   const handleTestEmail = async () => {
     setSaving(true); setError(null)
     try {
-      const res = await settingsApi.testEmail()
+      await dispatch(sendTestEmail()).unwrap()
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
       // Reuse the saved state UI; error state covers failures
-      if (!res.success) setError(res.message || 'Failed to send test email')
+      
     } catch (err) {
       setError(apiMsg(err, 'Failed to send test email'))
     } finally {
@@ -606,6 +618,7 @@ function NotificationsTab({ settings, onRefresh }: { settings: AppSettings | nul
 
 // ─── DangerZoneTab ────────────────────────────────────────
 function DangerZoneTab({ onToast }: { onToast: (t: ToastState) => void }) {
+  const dispatch = useAppDispatch()
   const [confirmText, setConfirmText] = useState('')
   const [showConfirm, setShowConfirm] = useState<string | null>(null)
   const [acting, setActing]           = useState(false)
@@ -636,8 +649,8 @@ function DangerZoneTab({ onToast }: { onToast: (t: ToastState) => void }) {
   const handleConfirm = async (id: string) => {
     setActing(true)
     try {
-      const res = await settingsApi.dangerAction(id as 'flush-sessions' | 'ban-all-users' | 'reset')
-      onToast({ msg: res.message ?? 'Action completed.', type: 'success' })
+      const res = await dispatch(executeDangerAction(id as 'flush-sessions' | 'ban-all-users' | 'reset')).unwrap()
+      onToast({ msg: (res as any)?.message ?? 'Action completed.', type: 'success' })
     } catch (err) {
       onToast({ msg: apiMsg(err, 'Action failed'), type: 'error' })
     } finally {
@@ -717,22 +730,15 @@ const NAV: { id: Tab; label: string; desc: string; icon: React.ReactNode }[] = [
 // ─── Main Page ────────────────────────────────────────────
 export default function SettingsPage() {
   const user       = useAppSelector(s => s.auth.user)
+  const toast      = useAppSelector(s => s.ui.toast)
   const [activeTab, setActiveTab] = useState<Tab>('profile')
-  const [settings, setSettings]   = useState<AppSettings | null>(null)
-  const [loading, setLoading]     = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [toast, setToast]         = useState<ToastState | null>(null)
+  const { data: settings, loading, error: loadError } = useAppSelector(s => s.settings)
+  const dispatch = useAppDispatch()
+  
 
   const loadSettings = useCallback(async () => {
-    try {
-      const data = await settingsApi.get()
-      setSettings(data)
-    } catch (err) {
-      setLoadError(apiMsg(err, 'Failed to load settings'))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+    await dispatch(fetchSettings())
+  }, [dispatch])
 
   useEffect(() => { void loadSettings() }, [loadSettings])
 
@@ -835,14 +841,14 @@ export default function SettingsPage() {
                 {activeTab === 'security'      && <SecurityTab settings={settings} onRefresh={loadSettings} />}
                 {activeTab === 'verification'  && <VerificationTab settings={settings} onRefresh={loadSettings} />}
                 {activeTab === 'notifications' && <NotificationsTab settings={settings} onRefresh={loadSettings} />}
-                {activeTab === 'danger'        && <DangerZoneTab onToast={setToast} />}
+                {activeTab === 'danger'        && <DangerZoneTab onToast={(t) => dispatch(setToast(t))} />}
               </>
             )}
           </div>
         </div>
       </div>
 
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      {toast && <Toast msg={toast.msg} type={toast.type === 'warning' ? 'info' : toast.type} onClose={() => dispatch(clearToast())} />}
     </div>
   )
 }

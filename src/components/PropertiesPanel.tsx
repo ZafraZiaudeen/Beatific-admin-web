@@ -54,7 +54,7 @@ function ColorInput({ value, onChange }: { value: string; onChange: (v: string) 
 
 export default function PropertiesPanel() {
   const {
-    state, currentPage, selectedElement,
+    currentPage, selectedElement,
     updateElement, deleteSelected,
     setBackground, reorderElement,
     dispatch,

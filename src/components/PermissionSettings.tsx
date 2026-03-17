@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import { mainCategoryApi, categoryApi, permissionApi, contentApi } from '../api/apiClient'
+import { useCallback, useEffect, useState } from 'react'
+import { mainCategoryApi, categoryApi, permissionApi } from '../api/apiClient'
+import ContentService from '../services/contentService'
 
 interface MainCategory {
   _id: string; name: string; slug: string; color: string; order: number
@@ -27,7 +28,11 @@ const ROLES: { value: string | null; label: string; desc: string }[] = [
   { value: 'secondary', label: 'Secondary', desc: 'Placed ONTO a primary (e.g. Sticker, Washi-Tape)' },
 ]
 
+import { useAppDispatch } from '../api/hooks'
+import { setToast } from '../slices/uiSlice'
+
 export default function PermissionSettings() {
+  const dispatch = useAppDispatch()
   const [mainCats, setMainCats] = useState<MainCategory[]>([])
   const [catsByType, setCatsByType] = useState<Record<string, SubCategory[]>>({})
   const [itemsByCat, setItemsByCat] = useState<Record<string, ContentItem[]>>({})
@@ -71,7 +76,7 @@ export default function PermissionSettings() {
       for (const mc of mcs) {
         for (const cat of (catMap[mc.slug] ?? [])) {
           const key = `${mc.slug}::${cat.slug}`
-          const res = await contentApi.list({ itemType: mc.slug, category: cat.slug })
+          const res = await ContentService.list({ itemType: mc.slug, category: cat.slug })
           itemMap[key] = ((res.data ?? []) as ContentItem[]).filter(i => i.isPublished)
         }
       }
@@ -112,8 +117,8 @@ export default function PermissionSettings() {
     setSaving(true); setError(null)
     try {
       await permissionApi.bulkUpsert(permissions.map(p => ({ scope: p.scope, targetType: p.targetType, enabled: p.enabled, placementRole: p.placementRole || null, allowedCategories: p.allowedCategories ?? [], allowedItems: p.allowedItems ?? [] })))
-      setSaved(true); setTimeout(() => setSaved(false), 3000)
-    } catch (e: any) { setError(e.message ?? 'Save failed') }
+      setSaved(true); setTimeout(() => setSaved(false), 3000); dispatch(setToast({ msg: 'Permissions saved successfully', type: 'success' }))
+    } catch (e: any) { setError(e.message ?? 'Save failed'); dispatch(setToast({ msg: e.message ?? 'Save failed', type: 'error' })) }
     finally { setSaving(false) }
   }
 

@@ -18,7 +18,7 @@ export default function AdminLayout() {
       <div className="flex-1 flex overflow-hidden min-h-0">
         <Sidebar onLogout={handleLogout} />
         <main className="flex-1 flex flex-col h-full overflow-hidden min-h-0 relative">
-          <HeaderBar />
+          <HeaderBar onLogout={handleLogout} />
           <Outlet />
         </main>
       </div>
