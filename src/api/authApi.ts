@@ -25,7 +25,63 @@ interface BackendProfileResponse {
 
 const toAdminRole = (role: string) => (isAdminRole(role) ? role : 'editor')
 
+export interface ForgotPasswordResponse {
+  message: string
+  expiresIn: number
+  resendCooldown: number
+  resendsRemaining: number
+}
+
+export interface VerifyResetCodeResponse {
+  message: string
+  resetToken: string
+}
+
+export interface ResetPasswordResponse {
+  message: string
+}
+
 const AuthApi = {
+  forgotPassword: async (email: string): Promise<ForgotPasswordResponse> => {
+    const response = await Api.request<{ success: boolean; data: ForgotPasswordResponse }>({
+      url: '/auth/forgot-password',
+      method: 'POST',
+      data: { email },
+      publicApi: true,
+    })
+    return response.data
+  },
+
+  verifyResetCode: async (email: string, code: string): Promise<VerifyResetCodeResponse> => {
+    const response = await Api.request<{ success: boolean; data: VerifyResetCodeResponse }>({
+      url: '/auth/verify-reset-code',
+      method: 'POST',
+      data: { email, code },
+      publicApi: true,
+    })
+    return response.data
+  },
+
+  resetPassword: async (resetToken: string, newPassword: string): Promise<ResetPasswordResponse> => {
+    const response = await Api.request<{ success: boolean; data: ResetPasswordResponse }>({
+      url: '/auth/reset-password',
+      method: 'POST',
+      data: { resetToken, newPassword },
+      publicApi: true,
+    })
+    return response.data
+  },
+
+  resendResetCode: async (email: string): Promise<ForgotPasswordResponse> => {
+    const response = await Api.request<{ success: boolean; data: ForgotPasswordResponse }>({
+      url: '/auth/resend-reset-code',
+      method: 'POST',
+      data: { email },
+      publicApi: true,
+    })
+    return response.data
+  },
+
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
     const response = await Api.request<BackendAuthResponse, LoginCredentials>({
       url: '/auth/login',

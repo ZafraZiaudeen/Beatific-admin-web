@@ -86,7 +86,13 @@ export default function SignIn() {
             <div className="space-y-1">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-medium text-stone-700">Password</label>
-                <a href="#" className="text-xs text-rose-600 hover:text-rose-700 font-medium">Forgot?</a>
+                <button
+                  type="button"
+                  onClick={() => navigate('/forgot-password')}
+                  className="text-xs text-rose-600 hover:text-rose-700 font-medium"
+                >
+                  Forgot?
+                </button>
               </div>
               <div className="relative">
                 <input
