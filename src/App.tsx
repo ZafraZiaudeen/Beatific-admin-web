@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 
 import SignInPage from './pages/sign-in.page'
 import SignUpPage from './pages/sign-up.page'
+import ForgotPasswordPage from './pages/forgot-password.page'
 import DashboardPage from './pages/dashboard.page'
 import ContentPage from './pages/content.page'
 import ContentEditorPage from './pages/content-editor.page'
@@ -31,6 +32,7 @@ function App() {
         <Route element={<AuthLayout />}>
           <Route path="/sign-in" element={<SignInPage />} />
           <Route path="/sign-up" element={<SignUpPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         </Route>
 
         <Route element={<ProtectedLayout />}>
