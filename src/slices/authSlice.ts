@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit'
 import type { PayloadAction } from '@reduxjs/toolkit'
 import { loginUser, registerUser, fetchUserProfile, logoutUser } from '@/actions/authAction'
+import { updateAdminProfile } from '@/actions/profileAction'
 import type { AuthState, LoginResponse } from '@/api/types'
 
 const initialState: AuthState = {
@@ -95,6 +96,13 @@ const authSlice = createSlice({
       state.isAuthenticated = false
       state.error = null
       state.loading = false
+    })
+
+    // Profile updates
+    builder.addCase(updateAdminProfile.fulfilled, (state, action) => {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload }
+      }
     })
   },
 })

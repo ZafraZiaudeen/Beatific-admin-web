@@ -1,17 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { templateApi } from '../api/apiClient'
-
-interface TemplateItem {
-  _id: string
-  name: string
-  category?: string
-  description?: string
-  isPublished: boolean
-  pages: any[]
-  createdAt: string
-  updatedAt: string
-  tags?: string[]
-}
+import { useAppDispatch, useAppSelector } from '../api/hooks'
+import { fetchTemplates, deleteTemplate, toggleTemplatePublish } from '../actions/templateAction'
+import type { TemplateItem } from '../api/types'
 
 type Props = {
   onEdit: (id: string, name: string, pages: any[]) => void
@@ -70,26 +60,14 @@ function TemplateThumbnail({ pages }: { pages: any[] }) {
 }
 
 export default function TemplatesList({ onEdit, onNew }: Props) {
-  const [templates, setTemplates] = useState<TemplateItem[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [search, setSearch]       = useState('')
-  const [deleting, setDeleting]   = useState<string | null>(null)
-  const [error, setError]         = useState<string | null>(null)
-  const [view, setView]           = useState<'grid' | 'list'>('grid')
-  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const dispatch = useAppDispatch()
+  const { items: templates, loading, deleting, togglingId, error } = useAppSelector(s => s.templates)
+  const [search, setSearch] = useState('')
+  const [view, setView]     = useState<'grid' | 'list'>('grid')
 
-  const load = useCallback(async (q?: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await templateApi.list(q)
-      setTemplates(res.data ?? [])
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to load templates')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const load = useCallback((q?: string) => {
+    dispatch(fetchTemplates(q ? { search: q } : undefined))
+  }, [dispatch])
 
   useEffect(() => { load() }, [load])
 
@@ -100,26 +78,18 @@ export default function TemplatesList({ onEdit, onNew }: Props) {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this template? This cannot be undone.')) return
-    setDeleting(id)
     try {
-      await templateApi.delete(id)
-      setTemplates(prev => prev.filter(t => t._id !== id))
+      await dispatch(deleteTemplate(id)).unwrap()
     } catch (e: any) {
-      alert(e.message ?? 'Delete failed')
-    } finally {
-      setDeleting(null)
+      alert(e?.message ?? 'Delete failed')
     }
   }
 
   const handleTogglePublish = async (tmpl: TemplateItem) => {
-    setTogglingId(tmpl._id)
     try {
-      const res = await templateApi.publish(tmpl._id, !tmpl.isPublished)
-      setTemplates(prev => prev.map(t => t._id === tmpl._id ? res.data : t))
+      await dispatch(toggleTemplatePublish({ id: tmpl._id, isPublished: !tmpl.isPublished })).unwrap()
     } catch (e: any) {
-      alert(e.message ?? 'Failed to update publish state')
-    } finally {
-      setTogglingId(null)
+      alert(e?.message ?? 'Failed to update publish state')
     }
   }
 
@@ -218,10 +188,10 @@ export default function TemplatesList({ onEdit, onNew }: Props) {
                 className="group bg-white rounded-xl border border-stone-200 overflow-hidden hover:border-stone-300 hover:shadow-md transition-all"
               >
                 <div className="h-36 border-b border-stone-100 relative">
-                  <TemplateThumbnail pages={tmpl.pages} />
+                  <TemplateThumbnail pages={tmpl.pages as any[]} />
                   <div className="absolute inset-0 bg-stone-900/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <button
-                      onClick={() => onEdit(tmpl._id, tmpl.name, tmpl.pages)}
+                      onClick={() => onEdit(tmpl._id, tmpl.name, tmpl.pages as any[])}
                       className="px-3 py-1.5 bg-white text-stone-900 text-xs font-semibold rounded-lg hover:bg-stone-100 transition-colors"
                     >
                       Edit
@@ -286,7 +256,7 @@ export default function TemplatesList({ onEdit, onNew }: Props) {
                       <div className="flex items-center gap-3">
                         <div
                           className="w-8 h-10 rounded border border-stone-200 flex-shrink-0 overflow-hidden"
-                          style={{ background: tmpl.pages?.[0]?.background ?? '#fff' }}
+                          style={{ background: (tmpl.pages as any[])?.[0]?.background ?? '#fff' }}
                         />
                         <div>
                           <p className="font-medium text-stone-900">{tmpl.name}</p>
@@ -314,7 +284,7 @@ export default function TemplatesList({ onEdit, onNew }: Props) {
                     <td className="px-5 py-3">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => onEdit(tmpl._id, tmpl.name, tmpl.pages)}
+                          onClick={() => onEdit(tmpl._id, tmpl.name, tmpl.pages as any[])}
                           className="text-xs font-medium text-sky-600 hover:text-sky-800 px-2 py-1 rounded hover:bg-sky-50 transition-colors"
                         >
                           Edit

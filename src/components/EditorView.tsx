@@ -6,8 +6,19 @@ import EditorToolbar from './editor/EditorToolbar'
 import PagesPanel from './editor/PagesPanel'
 import PropertiesPanel from './PropertiesPanel'
 import { downloadJSON, downloadSVG, downloadAllSVGs } from '../utils/exportUtils'
-import { contentApi, pdfApi, categoryApi, mediaApi } from '../api/apiClient'
+import { pdfApi, categoryApi, mediaApi } from '../api/apiClient'
+import ContentService from '../services/contentService'
+import { useAppDispatch } from '../api/hooks'
+import { createContent, updateContent } from '../actions/contentAction'
 import type { Page } from '../types/editor'
+import backIcon from '../assets/icons/back.svg'
+import undoIcon from '../assets/icons/undo.svg'
+import redoIcon from '../assets/icons/redo.svg'
+import spinnerIcon from '../assets/icons/spinner.svg'
+import importPdfIcon from '../assets/icons/import-pdf.svg'
+import fileIcon from '../assets/icons/file.svg'
+import checkIcon from '../assets/icons/check.svg'
+import infoIcon from '../assets/icons/info.svg'
 
 type Props = {
   onBack: () => void
@@ -32,6 +43,7 @@ function EditorInner({
   initialIsPublished?: boolean
   singlePageMode?: boolean
 }) {
+  const dispatch = useAppDispatch()
   const {
     state, setDocName, undo, redo, deleteSelected, setZoom, setTool, loadPages,
     stageRef, setCurrentPage, select,
@@ -52,7 +64,6 @@ function EditorInner({
   const exportRef   = useRef<HTMLDivElement>(null)
   const pdfInputRef = useRef<HTMLInputElement>(null)
 
-  /** Capture cover page (page 0) as a PNG blob via the Konva stage */
   const generateCoverImage = (): Promise<Blob | null> => {
     return new Promise((resolve) => {
       const stage = stageRef.current
@@ -61,7 +72,6 @@ function EditorInner({
       const prevSelected = state.selectedId
       const needSwitch = prevPage !== 0
 
-      // Deselect all elements so transformer handles don't appear in the capture
       select(null)
 
       const restore = () => {
@@ -131,7 +141,7 @@ function EditorInner({
     if (!docId) return
     setPublishState('toggling')
     try {
-      const res = await contentApi.publish(docId, !isPublished)
+      const res = await ContentService.publish(docId, !isPublished)
       setIsPublished(res.data?.isPublished ?? !isPublished)
     } catch (e: any) {
       alert(e.message ?? 'Failed to update publish state')
@@ -153,13 +163,13 @@ function EditorInner({
     try {
       let savedId = docId
       if (!docId) {
-        const res = await contentApi.create({ 
+        const res = await dispatch(createContent({
           name,
           itemType: documentType || 'content',
-          category, 
-          subcategory, 
-          pages: pages as any 
-        })
+          category,
+          subcategory,
+          pages: pages as object[],
+        })).unwrap()
         const newId = res.data?._id
         if (newId) {
           savedId = newId
@@ -171,14 +181,13 @@ function EditorInner({
         }
       } else {
         await Promise.all([
-          contentApi.update(docId, { name, category, subcategory }),
-          contentApi.savePages(docId, pages as any),
+          dispatch(updateContent({ id: docId, body: { name, category, subcategory } })).unwrap(),
+          ContentService.savePages(docId, pages as object[]),
         ])
         if (category)    setSavedCategory(category)
         if (subcategory) setSavedSubcategory(subcategory)
       }
 
-      // Auto-generate cover image from page 0
       if (savedId && pages.length > 0) {
         try {
           const blob = await generateCoverImage()
@@ -187,7 +196,7 @@ function EditorInner({
             const uploadRes = await mediaApi.upload(file)
             const url = uploadRes?.data?.url
             if (url) {
-              await contentApi.update(savedId, { coverImageUrl: url })
+              await dispatch(updateContent({ id: savedId, body: { coverImageUrl: url } })).unwrap()
             }
           }
         } catch {
@@ -236,7 +245,6 @@ function EditorInner({
           if (loadedFaces.has(cacheKey)) continue
 
           try {
-            // Use the FontFace API for reliable loading
             const fontFace = new FontFace(family, `url(${font.embeddedFile})`, {
               style,
               weight,
@@ -264,18 +272,14 @@ function EditorInner({
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-stone-100 min-h-0">
-      {/* ── Top bar ── */}
       <div className="h-12 bg-white border-b border-stone-200 flex items-center justify-between px-4 shrink-0 gap-2">
-        {/* Left */}
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onBack}
             title="Back"
             className="p-1.5 rounded text-stone-400 hover:text-stone-800 hover:bg-stone-100 transition-colors shrink-0"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 12H5M12 5l-7 7 7 7"/>
-            </svg>
+            <img src={backIcon} alt="Back" width={16} height={16} />
           </button>
           <div className="h-4 w-px bg-stone-200 shrink-0" />
           <input
@@ -293,25 +297,20 @@ function EditorInner({
           )}
         </div>
 
-        {/* Centre — undo/redo/zoom */}
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={undo}
             title="Undo (Ctrl+Z)"
             className="p-1.5 rounded hover:bg-stone-100 text-stone-500 transition-colors"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
-            </svg>
+            <img src={undoIcon} alt="Undo" width={14} height={14} />
           </button>
           <button
             onClick={redo}
             title="Redo (Ctrl+Y)"
             className="p-1.5 rounded hover:bg-stone-100 text-stone-500 transition-colors"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/>
-            </svg>
+            <img src={redoIcon} alt="Redo" width={14} height={14} />
           </button>
           <div className="h-4 w-px bg-stone-200 mx-1" />
           <button onClick={() => setZoom(Math.max(0.1, zoom - 0.1))} className="p-1.5 rounded hover:bg-stone-100 text-stone-500 text-sm transition-colors">−</button>
@@ -342,17 +341,12 @@ function EditorInner({
           >
             {pdfImporting ? (
               <>
-                <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                <img src={spinnerIcon} alt="Loading" className="animate-spin" width={12} height={12} />
                 Importing…
               </>
             ) : (
               <>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                  <line x1="12" y1="18" x2="12" y2="12"/>
-                  <line x1="9" y1="15" x2="15" y2="15"/>
-                </svg>
+                <img src={importPdfIcon} alt="Import PDF" width={12} height={12} />
                 Import PDF
               </>
             )}
@@ -388,7 +382,6 @@ function EditorInner({
             )}
           </div>
 
-          {/* Publish toggle button */}
           {docId && (
             <button
               onClick={handleTogglePublish}
@@ -401,11 +394,11 @@ function EditorInner({
               }`}
             >
               {publishState === 'toggling' ? (
-                <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                <img src={spinnerIcon} alt="Loading" className="animate-spin" width={12} height={12} />
               ) : isPublished ? (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+                <img src={checkIcon} alt="Published" width={12} height={12} />
               ) : (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                <img src={infoIcon} alt="Draft" width={12} height={12} />
               )}
               {publishState === 'toggling' ? '…' : isPublished ? 'Published' : 'Draft'}
             </button>
@@ -424,21 +417,17 @@ function EditorInner({
           >
             {saveState === 'saving' ? (
               <>
-                <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                <img src={spinnerIcon} alt="Saving" className="animate-spin" width={12} height={12} />
                 Saving…
               </>
             ) : saveState === 'saved' ? (
               <>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6 9 17l-5-5"/></svg>
+                <img src={checkIcon} alt="Saved" width={12} height={12} />
                 Saved!
               </>
             ) : saveState === 'error' ? '⚠ Retry' : (
               <>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                  <polyline points="17 21 17 13 7 13 7 21"/>
-                  <polyline points="7 3 7 8 15 8"/>
-                </svg>
+                <img src={fileIcon} alt="Save" width={12} height={12} />
                 Save
               </>
             )}
@@ -446,16 +435,15 @@ function EditorInner({
         </div>
       </div>
 
-      {/* ── Error toast ── */}
       {saveError && saveState === 'error' && (
         <div className="mx-4 mt-2 px-3 py-2 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700 flex items-center gap-2 shrink-0">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          <img src={infoIcon} alt="Error" width={14} height={14} />
           Save failed: {saveError}
         </div>
       )}
       {pdfImportError && (
         <div className="mx-4 mt-2 px-3 py-2 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700 flex items-center gap-2 shrink-0">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          <img src={infoIcon} alt="PDF error" width={14} height={14} />
           PDF import failed: {pdfImportError}
         </div>
       )}
@@ -480,15 +468,12 @@ function EditorInner({
             </div>
           </div>
 
-          {/* Pages panel */}
           <PagesPanel singlePageMode={singlePageMode} />
         </div>
 
-        {/* Right properties */}
         <PropertiesPanel />
       </div>
 
-      {/* ── Name modal ── */}
       {showNameModal && (
         <SaveModal
           defaultName={documentName === 'Untitled' ? '' : documentName}
@@ -505,7 +490,6 @@ function EditorInner({
   )
 }
 
-/* ─── SaveModal ──────────────────────────────────────── */
 interface CatItem { _id: string; name: string; slug: string; color: string; subcategories: { name: string; slug: string }[] }
 
 function SaveModal({
@@ -553,12 +537,10 @@ function SaveModal({
   const currentStepIdx = step === 'name' ? 0 : step === 'category' ? 1 : 2
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={e => { if (e.target === e.currentTarget) onCancel() }}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-100" onClick={e => { if (e.target === e.currentTarget) onCancel() }}>
       <div className="bg-white rounded-2xl shadow-2xl w-[420px] overflow-hidden">
-        {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-stone-100">
           <h2 className="text-sm font-bold text-stone-900">Save {documentType}</h2>
-          {/* Step indicator */}
           <div className="flex items-center gap-2 mt-3">
             {stepLabels.map((label, i) => (
               <React.Fragment key={label}>
@@ -576,7 +558,6 @@ function SaveModal({
           </div>
         </div>
 
-        {/* Step: Name */}
         {step === 'name' && (
           <div className="px-6 py-5">
             <p className="text-xs text-stone-400 mb-3">Give your {documentType} a descriptive name.</p>
@@ -595,7 +576,6 @@ function SaveModal({
           </div>
         )}
 
-        {/* Step: Category */}
         {step === 'category' && (
           <div className="px-6 py-5">
             <p className="text-xs text-stone-400 mb-3">Choose a category <span className="text-stone-300">(optional)</span></p>
@@ -628,7 +608,6 @@ function SaveModal({
           </div>
         )}
 
-        {/* Step: Subcategory */}
         {step === 'subcategory' && currentCat && (
           <div className="px-6 py-5">
             <p className="text-xs text-stone-400 mb-3">Choose a subcategory under <span className="font-semibold text-stone-700">{currentCat.name}</span> <span className="text-stone-300">(optional)</span></p>
@@ -657,9 +636,7 @@ function SaveModal({
 function EditorLoading({ documentType }: { documentType: string }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-stone-400">
-      <svg className="animate-spin" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-      </svg>
+        <img src={spinnerIcon} alt="Loading" className="animate-spin" width={28} height={28} />
       <span className="text-sm">Loading {documentType}…</span>
     </div>
   )
@@ -678,9 +655,15 @@ export default function EditorView({
 
   useEffect(() => {
     if (!editingId) return
-    contentApi.get(editingId)
-      .then(res => setInitialData({ name: res.data?.name ?? 'Untitled', pages: res.data?.pages ?? [], isPublished: res.data?.isPublished }))
-      .catch(e => setLoadError(e.message ?? 'Failed to load'))
+    ContentService.get(editingId)
+      .then((res) =>
+        setInitialData({
+          name: res.data?.name ?? 'Untitled',
+          pages: (res.data?.pages as Page[]) ?? [],
+          isPublished: res.data?.isPublished,
+        })
+      )
+      .catch((e: { message?: string }) => setLoadError(e.message ?? 'Failed to load'))
       .finally(() => setLoadingExisting(false))
   }, [editingId, documentType])
 

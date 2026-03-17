@@ -1,15 +1,12 @@
 import axios from 'axios'
 import type { AxiosRequestConfig, AxiosResponse, Method } from 'axios'
+import type { ApiError } from './types'
 import { getPersistedToken, clearPersistedAuth } from '@/utils/persistedAuth'
+import { API_BASE_URL } from '@/constants'
 
-const envBase = import.meta.env.VITE_API_BASE_URL
-const defaultBase = 'http://localhost:3002/api/v1'
-const baseURL = envBase ? envBase.replace(/\/+$/, '') : defaultBase
+const axiosInstance = axios.create({ baseURL: API_BASE_URL })
 
-const axiosInstance = axios.create({
-  baseURL,
-  // Don't set default Content-Type - we handle it per request
-})
+const activeRequests = new Map<string, Promise<AxiosResponse>>()
 
 export const setAuthToken = (token: string | null): void => {
   if (token) {
@@ -25,7 +22,6 @@ axiosInstance.interceptors.request.use(
     if (token && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`
     }
-    // Set Content-Type only for non-FormData requests
     if (!(config.data instanceof FormData)) {
       config.headers['Content-Type'] = 'application/json'
     }
@@ -44,8 +40,8 @@ axiosInstance.interceptors.response.use(
         msg.includes('expired') ||
         msg.includes('invalid') ||
         msg.includes('unauthorized')
-
-      if (isTokenIssue) {
+      const isPasswordError = msg.includes('correct password') || msg.includes('wrong password')
+      if (isTokenIssue && !isPasswordError) {
         clearPersistedAuth()
       }
     }
@@ -60,36 +56,112 @@ export interface RequestOptions<T = unknown> {
   params?: Record<string, unknown>
   headers?: Record<string, string>
   publicApi?: boolean
+  ignoreDuplicateCheck?: boolean
 }
 
 export const request = async <TResponse, TBody = unknown>(
   options: RequestOptions<TBody>
 ): Promise<TResponse> => {
-  const { url, method = 'GET', data, params, headers, publicApi } = options
+  const {
+    url,
+    method = 'GET',
+    data,
+    params,
+    headers: additionalHeaders,
+    publicApi = false,
+    ignoreDuplicateCheck = false,
+  } = options
+
+  const requestKey = `${method}:${url}:${JSON.stringify(params)}:${JSON.stringify(data)}`
+
+  if (!ignoreDuplicateCheck && activeRequests.has(requestKey)) {
+    const response = await activeRequests.get(requestKey)!
+    return response.data
+  }
 
   const config: AxiosRequestConfig = {
     url,
     method,
     params,
-    headers: { ...headers },
+    data,
+    headers: { ...additionalHeaders },
   }
 
-  if (data !== undefined) {
-    config.data = data
-    // For FormData, don't set Content-Type - let axios set it with boundary
-    if (data instanceof FormData) {
-      delete config.headers['Content-Type']
-    }
+  if (data instanceof FormData) {
+    delete config.headers!['Content-Type']
   }
 
   if (publicApi) {
-    config.headers = { ...config.headers }
-    delete config.headers.Authorization
+    delete config.headers!['Authorization']
   }
 
-  const response: AxiosResponse<TResponse> = await axiosInstance(config)
-  return response.data
+  try {
+    const requestPromise = axiosInstance(config)
+    if (!ignoreDuplicateCheck) {
+      activeRequests.set(requestKey, requestPromise)
+    }
+    const response = await requestPromise
+    return response.data
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      let errorMessage = 'Request failed'
+      if (error.response?.data) {
+        if (typeof error.response.data === 'object' && error.response.data.message) {
+          errorMessage = error.response.data.message
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      const apiError: ApiError = {
+        message: errorMessage,
+        status: error.response?.status,
+      }
+      throw apiError
+    }
+    throw {
+      message: 'Network error. Please check your connection.',
+      status: 0,
+    } as ApiError
+  } finally {
+    activeRequests.delete(requestKey)
+  }
 }
 
-const Api = { request }
+export const get = <TResponse>(
+  url: string,
+  params?: Record<string, unknown>,
+  options?: Partial<RequestOptions>
+): Promise<TResponse> =>
+  request<TResponse>({ url, method: 'GET', params, ...options })
+
+export const post = <TResponse, TBody = unknown>(
+  url: string,
+  data?: TBody,
+  options?: Partial<RequestOptions<TBody>>
+): Promise<TResponse> =>
+  request<TResponse, TBody>({ url, method: 'POST', data, ...options })
+
+export const put = <TResponse, TBody = unknown>(
+  url: string,
+  data?: TBody,
+  options?: Partial<RequestOptions<TBody>>
+): Promise<TResponse> =>
+  request<TResponse, TBody>({ url, method: 'PUT', data, ...options })
+
+export const patch = <TResponse, TBody = unknown>(
+  url: string,
+  data?: TBody,
+  options?: Partial<RequestOptions<TBody>>
+): Promise<TResponse> =>
+  request<TResponse, TBody>({ url, method: 'PATCH', data, ...options })
+
+export const del = <TResponse>(
+  url: string,
+  options?: Partial<RequestOptions>
+): Promise<TResponse> =>
+  request<TResponse>({ url, method: 'DELETE', ...options })
+
+const Api = { request, get, post, put, patch, del }
 export default Api

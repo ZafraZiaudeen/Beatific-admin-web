@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../api/hooks'
 import { loginUser } from '../actions/authAction'
 import { clearError } from '../slices/authSlice'
+import eyeIcon from '../assets/eye.svg'
+import eyeOffIcon from '../assets/eye-off.svg'
 
 export default function SignIn() {
   const navigate = useNavigate()
@@ -12,6 +14,7 @@ export default function SignIn() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -28,9 +31,9 @@ export default function SignIn() {
         <div className="z-10">
           <div className="flex items-center gap-2 mb-6">
             <div className="w-8 h-8 bg-stone-900 rounded-lg flex items-center justify-center text-white">
-              <span className="serif-font italic font-medium">J</span>
+              <span className="serif-font italic font-medium">B</span>
             </div>
-            <span className="font-semibold tracking-tight text-lg">Journalia Admin</span>
+            <span className="font-semibold tracking-tight text-lg">Beatific Admin</span>
           </div>
           <h1 className="serif-font text-5xl leading-tight text-stone-900 mb-4">
             Craft beautiful<br />digital journals.
@@ -46,7 +49,7 @@ export default function SignIn() {
         <div className="absolute bottom-0 right-0 w-full h-1/2 bg-linear-to-t from-stone-100 to-transparent pointer-events-none" />
 
         <div className="z-10 flex gap-4 text-xs font-medium text-stone-400">
-          <span>© 2024 Journalia Inc.</span>
+          <span>© 2026 Beatific.</span>
           <a href="#" className="hover:text-stone-900">Privacy</a>
           <a href="#" className="hover:text-stone-900">Terms</a>
         </div>
@@ -70,14 +73,14 @@ export default function SignIn() {
             )}
             <div className="space-y-1">
               <label className="text-xs font-medium text-stone-700">Email Address</label>
-              <input
-                type="email"
-                placeholder="admin@journalia.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-3 py-2.5 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-400 transition-all placeholder:text-stone-400"
-              />
+               <input
+                 type="email"
+                 placeholder="admin@beatific.com"
+                 value={email}
+                 onChange={(e) => setEmail(e.target.value)}
+                 required
+                 className="w-full px-3 py-2.5 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-400 transition-all placeholder:text-stone-400 pr-12"
+               />
             </div>
 
             <div className="space-y-1">
@@ -85,14 +88,28 @@ export default function SignIn() {
                 <label className="text-xs font-medium text-stone-700">Password</label>
                 <a href="#" className="text-xs text-rose-600 hover:text-rose-700 font-medium">Forgot?</a>
               </div>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-3 py-2.5 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-400 transition-all placeholder:text-stone-400"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full pr-10 px-3 py-2.5 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-400 transition-all placeholder:text-stone-400"
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPassword(s => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 rounded"
+                >
+                  {showPassword ? (
+                    <img src={eyeOffIcon} alt="Hide password" className="h-4 w-4" />
+                  ) : (
+                    <img src={eyeIcon} alt="Show password" className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <button

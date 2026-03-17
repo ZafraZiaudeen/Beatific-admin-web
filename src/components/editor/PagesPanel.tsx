@@ -17,7 +17,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Stage, Layer, Rect, Ellipse, RegularPolygon, Star, Text, Image as KonvaImage, Line, Arrow, Path } from 'react-konva'
 import { useEditor } from '../../context/useEditor'
-import { contentApi } from '../../api/apiClient'
+import ContentService from '../../services/contentService'
 import type { Page, CanvasElement } from '../../types/editor'
 
 function ThumbnailElement({ el }: { el: CanvasElement }) {
@@ -335,7 +335,7 @@ function PageLibraryPanel({ onInsert }: { onInsert: (pages: Page[]) => void }) {
   const load = useCallback(async (q?: string) => {
     setLoading(true)
     try {
-      const res = await contentApi.list({ itemType: 'page', search: q })
+      const res = await ContentService.list({ itemType: 'page', search: q })
       const data = (res.data ?? []) as LibraryItem[]
       // Only show published pages
       setItems(data.filter(d => d.isPublished))

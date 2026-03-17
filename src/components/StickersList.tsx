@@ -1,23 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
-import { stickerApi } from '../api/apiClient'
-
-interface StickerItem {
-  _id: string
-  name: string
-  category?: string
-  description?: string
-  isPublished: boolean
-  pages: any[]
-  createdAt: string
-  updatedAt: string
-  tags?: string[]
-}
+import { useAppDispatch, useAppSelector } from '../api/hooks'
+import { fetchStickers, deleteSticker, toggleStickerPublish } from '../actions/stickerAction'
+import type { StickerItem } from '../api/types'
 
 type Props = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onEdit: (id: string, name: string, pages: any[]) => void
   onNew: () => void
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function StickerThumbnail({ pages }: { pages: any[] }) {
   const bg = pages?.[0]?.background ?? '#ffffff'
   const elemCount = pages?.[0]?.elements?.length ?? 0
@@ -48,25 +40,13 @@ function StickerThumbnail({ pages }: { pages: any[] }) {
 }
 
 export default function StickersList({ onEdit, onNew }: Props) {
-  const [stickers, setStickers]   = useState<StickerItem[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [search, setSearch]       = useState('')
-  const [deleting, setDeleting]   = useState<string | null>(null)
-  const [error, setError]         = useState<string | null>(null)
-  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const dispatch = useAppDispatch()
+  const { items: stickers, loading, deleting, togglingId, error } = useAppSelector(s => s.stickers)
+  const [search, setSearch] = useState('')
 
-  const load = useCallback(async (q?: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await stickerApi.list(q)
-      setStickers(res.data ?? [])
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to load stickers')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const load = useCallback((q?: string) => {
+    dispatch(fetchStickers(q ? { search: q } : undefined))
+  }, [dispatch])
 
   useEffect(() => { load() }, [load])
 
@@ -77,26 +57,20 @@ export default function StickersList({ onEdit, onNew }: Props) {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this sticker? This cannot be undone.')) return
-    setDeleting(id)
     try {
-      await stickerApi.delete(id)
-      setStickers(prev => prev.filter(s => s._id !== id))
+      await dispatch(deleteSticker(id)).unwrap()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
-      alert(e.message ?? 'Delete failed')
-    } finally {
-      setDeleting(null)
+      alert(e?.message ?? 'Delete failed')
     }
   }
 
   const handleTogglePublish = async (sticker: StickerItem) => {
-    setTogglingId(sticker._id)
     try {
-      const res = await stickerApi.publish(sticker._id, !sticker.isPublished)
-      setStickers(prev => prev.map(s => s._id === sticker._id ? res.data : s))
+      await dispatch(toggleStickerPublish({ id: sticker._id, isPublished: !sticker.isPublished })).unwrap()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
-      alert(e.message ?? 'Failed to update publish state')
-    } finally {
-      setTogglingId(null)
+      alert(e?.message ?? 'Failed to update publish state')
     }
   }
 
@@ -174,14 +148,14 @@ export default function StickersList({ onEdit, onNew }: Props) {
               >
                 {/* Thumbnail */}
                 <div className="w-full h-full">
-                  <StickerThumbnail pages={sticker.pages} />
+                  <StickerThumbnail pages={sticker.pages as any[]} />
                 </div>
 
                 {/* Hover overlay */}
                 <div className="absolute inset-0 bg-stone-900/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
                   <p className="text-white text-[10px] font-medium text-center line-clamp-2 leading-tight">{sticker.name}</p>
                   <button
-                    onClick={() => onEdit(sticker._id, sticker.name, sticker.pages)}
+                    onClick={() => onEdit(sticker._id, sticker.name, sticker.pages as any[])}
                     className="w-full px-2 py-1.5 bg-white text-stone-900 text-[11px] font-semibold rounded-lg hover:bg-stone-100 transition-colors"
                   >
                     Edit

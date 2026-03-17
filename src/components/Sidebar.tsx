@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { API_BASE_URL } from '@/constants'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAppSelector } from '../api/hooks'
 import { mainCategoryApi, categoryApi } from '../api/apiClient'
@@ -585,7 +586,29 @@ export default function Sidebar({ onLogout }: Props) {
         <div className="p-3 border-t border-stone-100">
           <div className="flex items-center gap-3 px-2 py-2">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-stone-300 to-stone-400 overflow-hidden flex-shrink-0">
-              <img src={`https://api.dicebear.com/7.x/notionists/svg?seed=${user?.email ?? 'Admin'}`} alt="Admin" className="w-full h-full object-cover" />
+              {(() => {
+                const avatar = user?.avatar ?? ''
+                let src = `https://api.dicebear.com/7.x/notionists/svg?seed=${user?.email ?? 'Admin'}`
+                try {
+                  if (avatar) {
+                    if (/^https?:\/\//i.test(avatar)) src = avatar
+                    else {
+                      const base = new URL(API_BASE_URL).origin
+                      src = avatar.startsWith('/') ? `${base}${avatar}` : `${base}/${avatar}`
+                    }
+                  }
+                } catch (err) {
+                  // fallback to dicebear
+                }
+                return (
+                  <img
+                    src={src}
+                    alt={user?.name ?? 'Admin'}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/notionists/svg?seed=${user?.email ?? 'Admin'}` }}
+                  />
+                )
+              })()}
             </div>
             <div className="text-left flex-1 min-w-0">
               <p className="text-xs font-semibold text-stone-900 truncate">{user?.name ?? 'Admin'}</p>

@@ -1,7 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
-import { userApi } from '../api/apiClient'
-import { useAppSelector } from '../api/hooks'
+import { useAppDispatch, useAppSelector } from '../api/hooks'
+import {
+  fetchAdminUsers, fetchAppUsers, createAdminUser, createAppUser,
+  updateAdminUserRole, toggleAdminUserBan, toggleAppUserBan,
+  deleteAdminUser, deleteAppUser, bulkDeleteAdminUsers, bulkDeleteAppUsers
+} from '../actions/userAction'
+import { clearUserErrors } from '../slices/usersSlice'
+import type { AdminUser, AppUser } from '../api/types'
 
 function apiMsg(err: unknown, fallback = 'An error occurred'): string {
   if (!err || typeof err !== 'object') return fallback
@@ -13,32 +19,11 @@ function apiMsg(err: unknown, fallback = 'An error occurred'): string {
   return fallback
 }
 
-interface AdminUser {
-  _id: string
-  name: string
-  email: string
-  role: 'super_admin' | 'admin' | 'editor'
-  isBanned: boolean
-  lastActiveAt?: string
-  createdAt: string
-  updatedAt?: string
-}
-
-interface AppUser {
-  _id: string
-  name: string
-  email: string
-  avatar?: string
-  bio?: string
-  isBanned: boolean
-  lastActiveAt?: string
-  createdAt: string
-  updatedAt?: string
-}
 
 type Tab = 'admin' | 'app'
 
-function fmtDate(d: string) {
+function fmtDate(d?: string) {
+  if (!d) return '—'
   return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 function fmtRelative(d?: string) {
@@ -81,6 +66,10 @@ function StatusBadge({ banned }: { banned: boolean }) {
       Active
     </span>
   )
+}
+
+function resolveUserId(user: AdminUser | AppUser): string | null {
+  return user._id ?? ('id' in user && typeof user.id === 'string' ? user.id : null)
 }
 
 function Avatar({ name, src, size = 8 }: { name: string; src?: string; size?: number }) {
@@ -216,6 +205,7 @@ interface AddUserModalProps {
 }
 
 function AddUserModal({ tab, onClose, onCreated }: AddUserModalProps) {
+  const dispatch = useAppDispatch()
   const [name, setName]         = useState('')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -229,9 +219,9 @@ function AddUserModal({ tab, onClose, onCreated }: AddUserModalProps) {
     setSaving(true)
     try {
       if (tab === 'admin') {
-        await userApi.createAdminUser({ name, email, password, role })
+        await dispatch(createAdminUser({ name, email, password, role })).unwrap()
       } else {
-        await userApi.createAppUser({ name, email, password })
+        await dispatch(createAppUser({ name, email, password })).unwrap()
       }
       onCreated()
     } catch (err: unknown) {
@@ -327,6 +317,7 @@ interface EditUserModalProps {
 }
 
 function EditUserModal({ user, tab, isSuperAdmin, onClose, onUpdated }: EditUserModalProps) {
+  const dispatch = useAppDispatch()
   const isAdmin   = tab === 'admin'
   const adminUser = isAdmin ? (user as AdminUser) : null
   const [role, setRole]       = useState(adminUser?.role ?? 'editor')
@@ -339,17 +330,22 @@ function EditUserModal({ user, tab, isSuperAdmin, onClose, onUpdated }: EditUser
 
   const handleSave = async () => {
     if (!hasChanges) return
+    const userId = resolveUserId(user)
+    if (!userId) {
+      setError('Missing user id')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
       if (isAdmin && role !== adminUser?.role) {
-        await userApi.updateAdminUserRole(user._id, role)
+        await dispatch(updateAdminUserRole({ id: userId, role })).unwrap()
       }
       if (banned !== user.isBanned) {
         if (isAdmin) {
-          await userApi.toggleAdminUserBan(user._id)
+          await dispatch(toggleAdminUserBan(userId)).unwrap()
         } else {
-          await userApi.toggleAppUserBan(user._id)
+          await dispatch(toggleAppUserBan(userId)).unwrap()
         }
       }
       setSuccess(true)
@@ -480,6 +476,7 @@ interface DeleteModalProps {
 }
 
 function DeleteModal({ userId, userName, tab, onClose, onDeleted }: DeleteModalProps) {
+  const dispatch = useAppDispatch()
   const [deleting, setDeleting] = useState(false)
   const [error, setError]       = useState<string | null>(null)
 
@@ -488,9 +485,9 @@ function DeleteModal({ userId, userName, tab, onClose, onDeleted }: DeleteModalP
     setError(null)
     try {
       if (tab === 'admin') {
-        await userApi.deleteAdminUser(userId)
+        await dispatch(deleteAdminUser(userId)).unwrap()
       } else {
-        await userApi.deleteAppUser(userId)
+        await dispatch(deleteAppUser(userId)).unwrap()
       }
       onDeleted()
     } catch (err: unknown) {
@@ -622,12 +619,8 @@ export default function UsersPage() {
   const isSuperAdmin = currentUser?.role === 'super_admin'
 
   const [tab, setTab]                   = useState<Tab>('admin')
-  const [adminUsers, setAdminUsers]     = useState<AdminUser[]>([])
-  const [appUsers, setAppUsers]         = useState<AppUser[]>([])
-  const [adminTotal, setAdminTotal]     = useState(0)
-  const [appTotal, setAppTotal]         = useState(0)
-  const [adminPages, setAdminPages]     = useState(1)
-  const [appPages, setAppPages]         = useState(1)
+  const { adminUsers, appUsers, adminTotal, appTotal, adminPages, appPages, loading, error } = useAppSelector(s => s.users)
+  const dispatch = useAppDispatch()
   const [adminPage, setAdminPage]       = useState(1)
   const [appPage, setAppPage]           = useState(1)
   const [limit, setLimit]               = useState(10)
@@ -635,8 +628,6 @@ export default function UsersPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleFilter, setRoleFilter]     = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [loading, setLoading]           = useState(false)
-  const [error, setError]               = useState<string | null>(null)
   const [selectedIds, setSelectedIds]   = useState<Set<string>>(new Set())
 
   const [showAdd, setShowAdd]             = useState(false)
@@ -652,42 +643,19 @@ export default function UsersPage() {
     searchTimeout.current = setTimeout(() => { setDebouncedSearch(val); setAdminPage(1); setAppPage(1) }, 350)
   }
 
-  const fetchAdminUsers = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await userApi.listAdminUsers({ page: adminPage, limit, search: debouncedSearch })
-      setAdminUsers(res.users ?? [])
-      setAdminTotal(res.total ?? 0)
-      setAdminPages(res.pages ?? 1)
-    } catch (err: unknown) {
-      setError(apiMsg(err, 'Failed to load admin users'))
-    } finally {
-      setLoading(false)
-    }
-  }, [adminPage, limit, debouncedSearch])
+  const doFetchAdminUsers = useCallback(() => {
+    dispatch(fetchAdminUsers({ page: adminPage, limit, search: debouncedSearch }))
+  }, [dispatch, adminPage, limit, debouncedSearch])
 
-  /* ── fetch app users ── */
-  const fetchAppUsers = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await userApi.listAppUsers({ page: appPage, limit, search: debouncedSearch })
-      setAppUsers(res.users ?? [])
-      setAppTotal(res.total ?? 0)
-      setAppPages(res.pages ?? 1)
-    } catch (err: unknown) {
-      setError(apiMsg(err, 'Failed to load app users'))
-    } finally {
-      setLoading(false)
-    }
-  }, [appPage, limit, debouncedSearch])
+  const doFetchAppUsers = useCallback(() => {
+    dispatch(fetchAppUsers({ page: appPage, limit, search: debouncedSearch }))
+  }, [dispatch, appPage, limit, debouncedSearch])
 
   useEffect(() => {
     setSelectedIds(new Set())
-    if (tab === 'admin') void fetchAdminUsers()
-    else void fetchAppUsers()
-  }, [tab, fetchAdminUsers, fetchAppUsers])
+    if (tab === 'admin') doFetchAdminUsers()
+    else doFetchAppUsers()
+  }, [tab, doFetchAdminUsers, doFetchAppUsers])
 
   /* ── Client-side filtering ── */
   const filteredAdminUsers = adminUsers.filter(u => {
@@ -708,13 +676,33 @@ export default function UsersPage() {
   const currentPages = tab === 'admin' ? adminPages : appPages
 
   /* ── Checkbox helpers ── */
-  const allSelected  = currentUsers.length > 0 && currentUsers.every(u => selectedIds.has(u._id))
-  const someSelected = currentUsers.some(u => selectedIds.has(u._id)) && !allSelected
+  const allSelected = currentUsers.length > 0 && currentUsers.every((u) => {
+    const id = resolveUserId(u)
+    return id ? selectedIds.has(id) : false
+  })
+  const someSelected = currentUsers.some((u) => {
+    const id = resolveUserId(u)
+    return id ? selectedIds.has(id) : false
+  }) && !allSelected
   const toggleAll = () => {
     if (allSelected) {
-      setSelectedIds(prev => { const n = new Set(prev); currentUsers.forEach(u => n.delete(u._id)); return n })
+      setSelectedIds(prev => {
+        const n = new Set(prev)
+        currentUsers.forEach((u) => {
+          const id = resolveUserId(u)
+          if (id) n.delete(id)
+        })
+        return n
+      })
     } else {
-      setSelectedIds(prev => { const n = new Set(prev); currentUsers.forEach(u => n.add(u._id)); return n })
+      setSelectedIds(prev => {
+        const n = new Set(prev)
+        currentUsers.forEach((u) => {
+          const id = resolveUserId(u)
+          if (id) n.add(id)
+        })
+        return n
+      })
     }
   }
   const toggleOne = (id: string) => {
@@ -766,20 +754,21 @@ export default function UsersPage() {
 
   const handleBulkDelete = async () => {
     setBulkDeleting(true)
-    setError(null)
+    dispatch(clearUserErrors())
     try {
       const ids = [...selectedIds]
       if (tab === 'admin') {
-        await userApi.deleteAdminUsers(ids)
-        void fetchAdminUsers()
+        await dispatch(bulkDeleteAdminUsers(ids)).unwrap()
+        doFetchAdminUsers()
       } else {
-        await userApi.deleteAppUsers(ids)
-        void fetchAppUsers()
+        await dispatch(bulkDeleteAppUsers(ids)).unwrap()
+        doFetchAppUsers()
       }
       setSelectedIds(new Set())
       setConfirmBulkDel(false)
     } catch (err: unknown) {
-      setError(apiMsg(err, 'Failed to delete users'))
+      
+      console.error(err)
     } finally {
       setBulkDeleting(false)
     }
@@ -907,7 +896,7 @@ export default function UsersPage() {
           <div className="flex items-center gap-3 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             <span className="flex-1">{error}</span>
-            <button onClick={() => setError(null)} className="text-rose-400 hover:text-rose-700 transition-colors"><CloseIcon /></button>
+            <button onClick={() => dispatch(clearUserErrors())} className="text-rose-400 hover:text-rose-700 transition-colors"><CloseIcon /></button>
           </div>
         )}
 
@@ -1000,17 +989,20 @@ export default function UsersPage() {
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {currentUsers.map(user => {
-                    const isSelected = selectedIds.has(user._id)
+                    const userId = resolveUserId(user)
+                    const rowKey = userId ?? `${user.email}-${user.name}`
+                    const isSelected = userId ? selectedIds.has(userId) : false
                     return (
                       <tr
-                        key={user._id}
+                        key={rowKey}
                         className={`group transition-colors ${isSelected ? 'bg-stone-50' : 'hover:bg-stone-50/60'}`}
                       >
                         <td className="w-11 px-4 py-4">
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            onChange={() => toggleOne(user._id)}
+                            onChange={() => { if (userId) toggleOne(userId) }}
+                            disabled={!userId}
                             className="w-4 h-4 rounded accent-stone-900 cursor-pointer"
                           />
                         </td>
@@ -1024,7 +1016,7 @@ export default function UsersPage() {
                           <span className="text-sm text-stone-500">{user.email}</span>
                         </td>
                         <td className="px-4 py-4">
-                          <StatusBadge banned={user.isBanned} />
+                          <StatusBadge banned={!!user.isBanned} />
                         </td>
                         {tab === 'admin' && (
                           <td className="px-4 py-4">
@@ -1047,8 +1039,9 @@ export default function UsersPage() {
                               <EditIcon />
                             </button>
                             <button
-                              onClick={() => setConfirmDel({ id: user._id, name: user.name })}
+                              onClick={() => { if (userId) setConfirmDel({ id: userId, name: user.name }) }}
                               title="Delete user"
+                              disabled={!userId}
                               className="w-8 h-8 flex items-center justify-center rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                             >
                               <TrashIcon />
@@ -1111,8 +1104,8 @@ export default function UsersPage() {
           onClose={() => setShowAdd(false)}
           onCreated={() => {
             setShowAdd(false)
-            if (tab === 'admin') void fetchAdminUsers()
-            else void fetchAppUsers()
+            if (tab === 'admin') doFetchAdminUsers()
+            else doFetchAppUsers()
           }}
         />
       )}
@@ -1124,8 +1117,8 @@ export default function UsersPage() {
           onClose={() => setEditUser(null)}
           onUpdated={() => {
             setEditUser(null)
-            if (tab === 'admin') void fetchAdminUsers()
-            else void fetchAppUsers()
+            if (tab === 'admin') doFetchAdminUsers()
+            else doFetchAppUsers()
           }}
         />
       )}
@@ -1137,8 +1130,8 @@ export default function UsersPage() {
           onClose={() => setConfirmDel(null)}
           onDeleted={() => {
             setConfirmDel(null)
-            if (tab === 'admin') void fetchAdminUsers()
-            else void fetchAppUsers()
+            if (tab === 'admin') doFetchAdminUsers()
+            else doFetchAppUsers()
           }}
         />
       )}

@@ -1,20 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { contentApi } from '../api/apiClient'
-
-interface ContentItem {
-  _id: string
-  name: string
-  itemType: string
-  category?: string
-  subcategory?: string
-  description?: string
-  isPublished: boolean
-  pages: object[]
-  createdAt: string
-  updatedAt: string
-  tags?: string[]
-}
+import { useAppDispatch, useAppSelector } from '../api/hooks'
+import { fetchContent, deleteContent, toggleContentPublish } from '../actions/contentAction'
+import type { ContentItem } from '../api/types'
 
 function Thumbnail({ pages, itemType }: { pages: object[]; itemType: string }) {
   const firstPage = (pages as Array<{ background?: string; elements?: unknown[] }>)?.[0]
@@ -77,29 +65,20 @@ export default function ContentPage() {
   const subSlug = searchParams.get('sub')  ?? undefined
   const mini    = searchParams.get('mini') ?? undefined
 
-  const [items,      setItems]      = useState<ContentItem[]>([])
-  const [loading,    setLoading]    = useState(true)
-  const [search,     setSearch]     = useState('')
-  const [deleting,   setDeleting]   = useState<string | null>(null)
-  const [togglingId, setTogglingId] = useState<string | null>(null)
-  const [view,       setView]       = useState<'grid' | 'list'>('grid')
-  const [error,      setError]      = useState<string | null>(null)
+  const { items, loading, deleting, togglingId, error } = useAppSelector(s => s.content)
+  const dispatch = useAppDispatch()
 
-  const load = useCallback(async (q?: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await contentApi.list({
-        itemType:    type || undefined,
-        search:      q,
-        category:    subSlug,
-        subcategory: mini,
-      })
-      setItems(res.data ?? [])
-    } catch (e: unknown) {
-      setError((e as Error).message ?? 'Failed to load')
-    } finally { setLoading(false) }
-  }, [type, subSlug, mini])
+  const [search,     setSearch]     = useState('')
+  const [view,       setView]       = useState<'grid' | 'list'>('grid')
+
+  const load = useCallback((q?: string) => {
+    dispatch(fetchContent({
+      itemType:    type || undefined,
+      search:      q,
+      category:    subSlug,
+      subcategory: mini,
+    }))
+  }, [dispatch, type, subSlug, mini])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
@@ -109,19 +88,14 @@ export default function ContentPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this item? This cannot be undone.')) return
-    setDeleting(id)
-    try { await contentApi.delete(id); setItems(prev => prev.filter(i => i._id !== id)) }
-    catch (e: unknown) { alert((e as Error).message ?? 'Delete failed') }
-    finally { setDeleting(null) }
+    try { await dispatch(deleteContent(id)).unwrap() }
+    catch (e: any) { alert(e?.message || 'Delete failed') }
   }
 
   const handleTogglePublish = async (item: ContentItem) => {
-    setTogglingId(item._id)
     try {
-      const res = await contentApi.publish(item._id, !item.isPublished)
-      setItems(prev => prev.map(i => i._id === item._id ? { ...i, isPublished: res.data?.isPublished ?? !item.isPublished } : i))
-    } catch (e: unknown) { alert((e as Error).message ?? 'Failed') }
-    finally { setTogglingId(null) }
+      await dispatch(toggleContentPublish({ id: item._id, isPublished: !item.isPublished })).unwrap()
+    } catch (e: any) { alert(e?.message || 'Failed') }
   }
 
   const newItemPath = `/content/editor${type ? `?type=${type}` : ''}`

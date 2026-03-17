@@ -1,5 +1,5 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
-import AuthApi from '../api/authApi'
+import AuthService from '../services/authService'
 import type { LoginCredentials, RegisterCredentials, LoginResponse, ApiError } from '@/api/types'
 import { serializeError } from '@/utils/errorSerializer'
 
@@ -9,7 +9,7 @@ export const loginUser = createAsyncThunk<
   { rejectValue: ApiError }
 >('auth/login', async (credentials, { rejectWithValue }) => {
   try {
-    return await AuthApi.login(credentials)
+    return await AuthService.login(credentials)
   } catch (error) {
     return rejectWithValue(serializeError(error))
   }
@@ -21,7 +21,7 @@ export const registerUser = createAsyncThunk<
   { rejectValue: ApiError }
 >('auth/register', async (credentials, { rejectWithValue }) => {
   try {
-    return await AuthApi.register(credentials)
+    return await AuthService.register(credentials)
   } catch (error) {
     return rejectWithValue(serializeError(error))
   }
@@ -33,7 +33,7 @@ export const fetchUserProfile = createAsyncThunk<
   { rejectValue: ApiError }
 >('auth/fetchProfile', async (_, { rejectWithValue }) => {
   try {
-    return await AuthApi.fetchProfile()
+    return await AuthService.fetchProfile()
   } catch (error) {
     return rejectWithValue(serializeError(error))
   }
