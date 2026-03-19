@@ -63,7 +63,7 @@ const templateSlice = createSlice({
 
     // ── Delete Template ──
     builder.addCase(deleteTemplate.pending, (state, action) => {
-      state.deleting = action.meta.arg
+      state.deleting = action.meta.arg.id
       state.error = null
     })
     builder.addCase(deleteTemplate.fulfilled, (state, action) => {
@@ -95,3 +95,4 @@ const templateSlice = createSlice({
 
 export const { clearTemplateError } = templateSlice.actions
 export default templateSlice.reducer
+

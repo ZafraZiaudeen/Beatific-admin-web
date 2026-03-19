@@ -42,8 +42,8 @@ class TemplateService {
     return TemplateApi.publish(id, isPublished)
   }
 
-  static async delete(id: string) {
-    return TemplateApi.delete(id)
+  static async delete(id: string, preserveForUsers?: boolean) {
+    return TemplateApi.delete(id, preserveForUsers)
   }
 }
 

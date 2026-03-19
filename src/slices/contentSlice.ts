@@ -68,7 +68,7 @@ const contentSlice = createSlice({
 
     // ── Delete Content ──
     builder.addCase(deleteContent.pending, (state, action) => {
-      state.deleting = action.meta.arg
+      state.deleting = action.meta.arg.id
       state.error = null
     })
     builder.addCase(deleteContent.fulfilled, (state, action) => {
@@ -100,3 +100,4 @@ const contentSlice = createSlice({
 
 export const { clearContentError } = contentSlice.actions
 export default contentSlice.reducer
+

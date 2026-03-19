@@ -43,8 +43,10 @@ const ContentApi = {
   publish: (id: string, isPublished: boolean) =>
     Api.patch<ApiData>(`/content/${id}/publish`, { isPublished }),
 
-  delete: (id: string) =>
-    Api.del<ApiData>(`/content/${id}`),
+  delete: (id: string, preserveForUsers?: boolean) =>
+    Api.del<ApiData>(`/content/${id}`, {
+      params: preserveForUsers === undefined ? undefined : { preserveForUsers },
+    }),
 
   stats: () =>
     Api.get<ApiData>('/content/stats'),

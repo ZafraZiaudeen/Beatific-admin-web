@@ -88,7 +88,10 @@ export default function ContentPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this item? This cannot be undone.')) return
-    try { await dispatch(deleteContent(id)).unwrap() }
+    const preserveForUsers = confirm(
+      'Allow existing journal owners to keep using this item after deletion?\n\nOK = Allow\nCancel = Delete from everywhere'
+    )
+    try { await dispatch(deleteContent({ id, preserveForUsers })).unwrap() }
     catch (e: any) { alert(e?.message || 'Delete failed') }
   }
 

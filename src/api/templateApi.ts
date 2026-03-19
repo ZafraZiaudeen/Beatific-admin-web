@@ -39,8 +39,10 @@ const TemplateApi = {
   publish: (id: string, isPublished: boolean) =>
     Api.patch<ApiData>(`/templates/${id}/publish`, { isPublished }),
 
-  delete: (id: string) =>
-    Api.del<ApiData>(`/templates/${id}`),
+  delete: (id: string, preserveForUsers?: boolean) =>
+    Api.del<ApiData>(`/templates/${id}`, {
+      params: preserveForUsers === undefined ? undefined : { preserveForUsers },
+    }),
 }
 
 export type { TemplateItem }
