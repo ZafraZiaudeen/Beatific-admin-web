@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../api/hooks'
 import { fetchContent, deleteContent, toggleContentPublish } from '../actions/contentAction'
+import DeleteWithPreserveModal from '../components/DeleteWithPreserveModal'
 import type { ContentItem } from '../api/types'
 
 function Thumbnail({ pages, itemType }: { pages: object[]; itemType: string }) {
@@ -70,6 +71,8 @@ export default function ContentPage() {
 
   const [search,     setSearch]     = useState('')
   const [view,       setView]       = useState<'grid' | 'list'>('grid')
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const load = useCallback((q?: string) => {
     dispatch(fetchContent({
@@ -86,13 +89,20 @@ export default function ContentPage() {
     return () => clearTimeout(t)
   }, [search, load])
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this item? This cannot be undone.')) return
-    const preserveForUsers = confirm(
-      'Allow existing journal owners to keep using this item after deletion?\n\nOK = Allow\nCancel = Delete from everywhere'
-    )
-    try { await dispatch(deleteContent({ id, preserveForUsers })).unwrap() }
-    catch (e: any) { alert(e?.message || 'Delete failed') }
+  const handleDelete = (item: ContentItem) => {
+    setDeleteError(null)
+    setConfirmDelete({ id: item._id, name: item.name })
+  }
+
+  const confirmDeleteAction = async (preserveForUsers: boolean) => {
+    if (!confirmDelete) return
+    setDeleteError(null)
+    try {
+      await dispatch(deleteContent({ id: confirmDelete.id, preserveForUsers })).unwrap()
+      setConfirmDelete(null)
+    } catch (e: any) {
+      setDeleteError(e?.message || 'Delete failed')
+    }
   }
 
   const handleTogglePublish = async (item: ContentItem) => {
@@ -197,7 +207,7 @@ export default function ContentPage() {
                   <Thumbnail pages={item.pages} itemType={item.itemType} />
                   <div className="absolute inset-0 bg-stone-900/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <button onClick={() => navigate(`/content/editor/${item._id}`)} className="px-3 py-1.5 bg-white text-stone-900 text-xs font-semibold rounded-lg hover:bg-stone-100">Edit</button>
-                    <button onClick={() => void handleDelete(item._id)} disabled={deleting === item._id} className="px-3 py-1.5 bg-rose-500 text-white text-xs font-semibold rounded-lg hover:bg-rose-600 disabled:opacity-50">
+                    <button onClick={() => void handleDelete(item)} disabled={deleting === item._id} className="px-3 py-1.5 bg-rose-500 text-white text-xs font-semibold rounded-lg hover:bg-rose-600 disabled:opacity-50">
                       {deleting === item._id ? '…' : 'Delete'}
                     </button>
                   </div>
@@ -267,7 +277,7 @@ export default function ContentPage() {
                     <td className="px-5 py-3">
                       <div className="flex items-center justify-end gap-2">
                         <button onClick={() => navigate(`/content/editor/${item._id}`)} className="text-xs font-medium text-sky-600 hover:text-sky-800 px-2 py-1 rounded hover:bg-sky-50">Edit</button>
-                        <button onClick={() => void handleDelete(item._id)} disabled={deleting === item._id} className="text-xs font-medium text-rose-500 hover:text-rose-700 px-2 py-1 rounded hover:bg-rose-50 disabled:opacity-50">
+                        <button onClick={() => void handleDelete(item)} disabled={deleting === item._id} className="text-xs font-medium text-rose-500 hover:text-rose-700 px-2 py-1 rounded hover:bg-rose-50 disabled:opacity-50">
                           {deleting === item._id ? '…' : 'Delete'}
                         </button>
                       </div>
@@ -279,6 +289,18 @@ export default function ContentPage() {
           </div>
         )}
       </div>
+      {confirmDelete && (
+        <DeleteWithPreserveModal
+          title="Delete Item"
+          description={`You are about to permanently delete "${confirmDelete.name}".`}
+          onClose={() => setConfirmDelete(null)}
+          onPreserve={() => void confirmDeleteAction(true)}
+          onDeleteEverywhere={() => void confirmDeleteAction(false)}
+          deleting={deleting === confirmDelete.id}
+          error={deleteError}
+        />
+      )}
     </div>
   )
 }
+

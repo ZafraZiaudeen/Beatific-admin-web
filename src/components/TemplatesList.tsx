@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAppDispatch, useAppSelector } from '../api/hooks'
 import { fetchTemplates, deleteTemplate, toggleTemplatePublish } from '../actions/templateAction'
 import type { TemplateItem } from '../api/types'
+import DeleteWithPreserveModal from './DeleteWithPreserveModal'
 
 type Props = {
   onEdit: (id: string, name: string, pages: object[]) => void
@@ -64,6 +65,8 @@ export default function TemplatesList({ onEdit, onNew }: Props) {
   const { items: templates, loading, deleting, togglingId, error } = useAppSelector(s => s.templates)
   const [search, setSearch] = useState('')
   const [view, setView]     = useState<'grid' | 'list'>('grid')
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const load = useCallback((q?: string) => {
     dispatch(fetchTemplates(q ? { search: q } : undefined))
@@ -76,15 +79,19 @@ export default function TemplatesList({ onEdit, onNew }: Props) {
     return () => clearTimeout(t)
   }, [search, load])
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this template? This cannot be undone.')) return
-    const preserveForUsers = confirm(
-      'Allow existing journal owners to keep using this template after deletion?\n\nOK = Allow\nCancel = Delete from everywhere'
-    )
+  const handleDelete = (tmpl: TemplateItem) => {
+    setDeleteError(null)
+    setConfirmDelete({ id: tmpl._id, name: tmpl.name })
+  }
+
+  const confirmDeleteAction = async (preserveForUsers: boolean) => {
+    if (!confirmDelete) return
+    setDeleteError(null)
     try {
-      await dispatch(deleteTemplate({ id, preserveForUsers })).unwrap()
+      await dispatch(deleteTemplate({ id: confirmDelete.id, preserveForUsers })).unwrap()
+      setConfirmDelete(null)
     } catch (e: any) {
-      alert(e?.message ?? 'Delete failed')
+      setDeleteError(e?.message ?? 'Delete failed')
     }
   }
 
@@ -200,7 +207,7 @@ export default function TemplatesList({ onEdit, onNew }: Props) {
                       Edit
                     </button>
                     <button
-                      onClick={() => handleDelete(tmpl._id)}
+                      onClick={() => handleDelete(tmpl)}
                       disabled={deleting === tmpl._id}
                       className="px-3 py-1.5 bg-rose-500 text-white text-xs font-semibold rounded-lg hover:bg-rose-600 transition-colors disabled:opacity-50"
                     >
@@ -293,7 +300,7 @@ export default function TemplatesList({ onEdit, onNew }: Props) {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(tmpl._id)}
+                          onClick={() => handleDelete(tmpl)}
                           disabled={deleting === tmpl._id}
                           className="text-xs font-medium text-rose-500 hover:text-rose-700 px-2 py-1 rounded hover:bg-rose-50 transition-colors disabled:opacity-50"
                         >
@@ -308,6 +315,18 @@ export default function TemplatesList({ onEdit, onNew }: Props) {
           </div>
         )}
       </div>
+      {confirmDelete && (
+        <DeleteWithPreserveModal
+          title="Delete Template"
+          description={`You are about to permanently delete "${confirmDelete.name}".`}
+          onClose={() => setConfirmDelete(null)}
+          onPreserve={() => void confirmDeleteAction(true)}
+          onDeleteEverywhere={() => void confirmDeleteAction(false)}
+          deleting={deleting === confirmDelete.id}
+          error={deleteError}
+        />
+      )}
     </div>
   )
 }
+
