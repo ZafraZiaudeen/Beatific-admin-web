@@ -1,10 +1,25 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../api/hooks'
 import { fetchContent, deleteContent, toggleContentPublish } from '../actions/contentAction'
+import DeleteWithPreserveModal from '../components/DeleteWithPreserveModal'
 import type { ContentItem } from '../api/types'
 
-function Thumbnail({ page }: { page: { background?: string; elements?: unknown[] } | undefined }) {
+function Thumbnail({
+  page,
+  confirmDelete,
+  setConfirmDelete,
+  confirmDeleteAction,
+  deleting,
+  deleteError,
+}: {
+  page: { background?: string; elements?: unknown[] } | undefined
+  confirmDelete: { id: string; name: string } | null
+  setConfirmDelete: Dispatch<SetStateAction<{ id: string; name: string } | null>>
+  confirmDeleteAction: (preserveForUsers: boolean) => Promise<void>
+  deleting: string | null
+  deleteError: string | null
+}) {
   const bg = page?.background ?? '#ffffff'
   const elemCount = page?.elements?.length ?? 0
   const isTransparent = bg === 'transparent'
@@ -29,6 +44,17 @@ function Thumbnail({ page }: { page: { background?: string; elements?: unknown[]
       ) : (
         <span className="text-xs font-medium text-stone-500">{elemCount} el</span>
       )}
+      {confirmDelete && (
+        <DeleteWithPreserveModal
+          title="Delete Page"
+          description={`You are about to permanently delete "${confirmDelete.name}".`}
+          onClose={() => setConfirmDelete(null)}
+          onPreserve={() => void confirmDeleteAction(true)}
+          onDeleteEverywhere={() => void confirmDeleteAction(false)}
+          deleting={deleting === confirmDelete.id}
+          error={deleteError}
+        />
+      )}
     </div>
   )
 }
@@ -38,6 +64,8 @@ export default function PagesPage() {
   const dispatch = useAppDispatch()
   const { items, loading, deleting, togglingId, error } = useAppSelector(s => s.content)
   const [search, setSearch] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const load = useCallback((q?: string) => {
     dispatch(fetchContent({ itemType: 'page', search: q }))
@@ -47,15 +75,19 @@ export default function PagesPage() {
 
   const handleSearch = () => load(search || undefined)
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this page?')) return
-    const preserveForUsers = confirm(
-      'Allow existing journal owners to keep using this page after deletion?\n\nOK = Allow\nCancel = Delete from everywhere'
-    )
+  const handleDelete = (item: ContentItem) => {
+    setDeleteError(null)
+    setConfirmDelete({ id: item._id, name: item.name })
+  }
+
+  const confirmDeleteAction = async (preserveForUsers: boolean) => {
+    if (!confirmDelete) return
+    setDeleteError(null)
     try {
-      await dispatch(deleteContent({ id, preserveForUsers })).unwrap()
+      await dispatch(deleteContent({ id: confirmDelete.id, preserveForUsers })).unwrap()
+      setConfirmDelete(null)
     } catch {
-      alert('Failed to delete')
+      setDeleteError('Failed to delete')
     }
   }
 
@@ -160,7 +192,14 @@ export default function PagesPage() {
               onClick={() => navigate(`/pages/editor/${item._id}`)}
             >
               <div className="aspect-3/4 relative">
-                <Thumbnail page={(item.pages as Array<{ background?: string; elements?: unknown[] }>)[0]} />
+                <Thumbnail
+                  page={(item.pages as Array<{ background?: string; elements?: unknown[] }>)[0]}
+                  confirmDelete={confirmDelete}
+                  setConfirmDelete={setConfirmDelete}
+                  confirmDeleteAction={confirmDeleteAction}
+                  deleting={deleting}
+                  deleteError={deleteError}
+                />
                 {/* Overlay buttons */}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -182,7 +221,7 @@ export default function PagesPage() {
                   <button
                     onClick={e => {
                       e.stopPropagation()
-                      handleDelete(item._id)
+                      handleDelete(item)
                     }}
                     disabled={deleting === item._id}
                     className="p-1.5 rounded-lg bg-white text-rose-500 hover:bg-rose-50 shadow-sm transition-colors"
@@ -220,3 +259,4 @@ export default function PagesPage() {
     </div>
   )
 }
+
