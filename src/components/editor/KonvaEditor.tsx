@@ -338,11 +338,11 @@ export default function KonvaEditor() {
       } else if (activeTool === 'star') {
         addElement({ id, type: 'star', x, y, outerRadius: 1, innerRadius: 0.5, numPoints: 5, fill: '#facc15', opacity: 1 })
       } else if (activeTool === 'hexagon') {
-        addElement({ id, type: 'polygon', x, y, width: 1, height: 1, numSides: 6, fill: '#818cf8', opacity: 1 })
+        addElement({ id, type: 'polygon', x, y, width: 1, height: 1, numSides: 6, numPoints: 6, fill: '#818cf8', opacity: 1 })
       } else if (activeTool === 'pentagon') {
-        addElement({ id, type: 'polygon', x, y, width: 1, height: 1, numSides: 5, fill: '#34d399', opacity: 1 })
+        addElement({ id, type: 'polygon', x, y, width: 1, height: 1, numSides: 5, numPoints: 5, fill: '#34d399', opacity: 1 })
       } else if (activeTool === 'diamond') {
-        addElement({ id, type: 'polygon', x, y, width: 1, height: 1, numSides: 4, fill: '#f472b6', opacity: 1 })
+        addElement({ id, type: 'polygon', x, y, width: 1, height: 1, numSides: 4, numPoints: 4, fill: '#f472b6', opacity: 1 })
       } else if (activeTool === 'line') {
         addElement({ id, type: 'line', x: 0, y: 0, points: [x, y, x, y], stroke: '#1a1a1a', strokeWidth: 2, opacity: 1 })
       } else if (activeTool === 'arrow') {

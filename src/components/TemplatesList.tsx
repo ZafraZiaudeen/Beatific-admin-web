@@ -4,7 +4,7 @@ import { fetchTemplates, deleteTemplate, toggleTemplatePublish } from '../action
 import type { TemplateItem } from '../api/types'
 
 type Props = {
-  onEdit: (id: string, name: string, pages: any[]) => void
+  onEdit: (id: string, name: string, pages: object[]) => void
   onNew: () => void
 }
 
@@ -78,8 +78,11 @@ export default function TemplatesList({ onEdit, onNew }: Props) {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this template? This cannot be undone.')) return
+    const preserveForUsers = confirm(
+      'Allow existing journal owners to keep using this template after deletion?\n\nOK = Allow\nCancel = Delete from everywhere'
+    )
     try {
-      await dispatch(deleteTemplate(id)).unwrap()
+      await dispatch(deleteTemplate({ id, preserveForUsers })).unwrap()
     } catch (e: any) {
       alert(e?.message ?? 'Delete failed')
     }

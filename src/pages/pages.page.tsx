@@ -49,8 +49,11 @@ export default function PagesPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this page?')) return
+    const preserveForUsers = confirm(
+      'Allow existing journal owners to keep using this page after deletion?\n\nOK = Allow\nCancel = Delete from everywhere'
+    )
     try {
-      await dispatch(deleteContent(id)).unwrap()
+      await dispatch(deleteContent({ id, preserveForUsers })).unwrap()
     } catch {
       alert('Failed to delete')
     }

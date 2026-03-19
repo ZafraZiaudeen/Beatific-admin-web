@@ -46,8 +46,8 @@ class ContentService {
     return ContentApi.publish(id, isPublished)
   }
 
-  static async delete(id: string) {
-    return ContentApi.delete(id)
+  static async delete(id: string, preserveForUsers?: boolean) {
+    return ContentApi.delete(id, preserveForUsers)
   }
 
   static async stats() {

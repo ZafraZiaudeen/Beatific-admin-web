@@ -52,11 +52,11 @@ export const updateContent = createAsyncThunk<
 
 export const deleteContent = createAsyncThunk<
   string,
-  string,
+  { id: string; preserveForUsers?: boolean },
   { rejectValue: ApiError }
->('content/delete', async (id, { rejectWithValue }) => {
+>('content/delete', async ({ id, preserveForUsers }, { rejectWithValue }) => {
   try {
-    await ContentService.delete(id)
+    await ContentService.delete(id, preserveForUsers)
     return id
   } catch (error) {
     return rejectWithValue(serializeError(error))

@@ -37,11 +37,11 @@ export const createTemplate = createAsyncThunk<
 
 export const deleteTemplate = createAsyncThunk<
   string,
-  string,
+  { id: string; preserveForUsers?: boolean },
   { rejectValue: ApiError }
->('templates/delete', async (id, { rejectWithValue }) => {
+>('templates/delete', async ({ id, preserveForUsers }, { rejectWithValue }) => {
   try {
-    await TemplateService.delete(id)
+    await TemplateService.delete(id, preserveForUsers)
     return id
   } catch (error) {
     return rejectWithValue(serializeError(error))
