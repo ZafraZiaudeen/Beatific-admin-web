@@ -236,3 +236,61 @@ export interface PaginatedUsersResponse {
   pages: number
   page: number
 }
+
+export interface DashboardTrendPoint {
+  date: string
+  count: number
+}
+
+export interface DashboardAlert {
+  id: string
+  severity: 'info' | 'warning' | 'critical'
+  title: string
+  message: string
+}
+
+export interface DashboardOverview {
+  generatedAt: string
+  windowDays: number
+  kpis: {
+    totalUsers: number
+    appUsers: number
+    adminUsers: number
+    activeUsersInWindow: number
+    totalContent: number
+    publishedContent: number
+    draftContent: number
+    publishRate: number
+    bannedAppUsers: number
+  }
+  trends: {
+    userSignups: DashboardTrendPoint[]
+    contentCreated: DashboardTrendPoint[]
+    contentPublished: DashboardTrendPoint[]
+  }
+  contentByType: Array<{ type: string; count: number; share: number }>
+  recent: {
+    users: Array<{
+      id: string
+      name: string
+      email: string
+      isBanned: boolean
+      createdAt: string
+      lastActiveAt?: string
+    }>
+    content: Array<{
+      id: string
+      name: string
+      itemType: string
+      category?: string
+      isPublished: boolean
+      updatedAt: string
+    }>
+  }
+  alerts: DashboardAlert[]
+}
+
+export interface DashboardOverviewEnvelope {
+  success: boolean
+  data: DashboardOverview
+}

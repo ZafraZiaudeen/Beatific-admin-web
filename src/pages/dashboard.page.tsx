@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import Dashboard from '../components/Dashboard'
+import Dashboard from '@/components/Dashboard'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -7,6 +7,8 @@ export default function DashboardPage() {
     <Dashboard
       onNewContent={() => navigate('/content/editor')}
       onViewContent={() => navigate('/content')}
+      onViewUsers={() => navigate('/users')}
+      onViewSettings={() => navigate('/settings')}
     />
   )
 }
