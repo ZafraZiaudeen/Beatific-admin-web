@@ -42,6 +42,16 @@ class ContentService {
     return ContentApi.savePages(id, pages, svgContent)
   }
 
+  static async saveAll(id: string, body: {
+    name?: string
+    category?: string
+    subcategory?: string
+    pages: object[]
+    svgContent?: string
+  }) {
+    return ContentApi.saveAll(id, body)
+  }
+
   static async publish(id: string, isPublished: boolean) {
     return ContentApi.publish(id, isPublished)
   }

@@ -7,6 +7,7 @@ import PagesPanel from './editor/PagesPanel'
 import PropertiesPanel from './PropertiesPanel'
 import { downloadJSON, downloadSVG, downloadAllSVGs } from '../utils/exportUtils'
 import { pdfApi, categoryApi, mediaApi } from '../api/apiClient'
+import type { PdfJobStatus } from '../api/apiClient'
 import ContentService from '../services/contentService'
 import { useAppDispatch } from '../api/hooks'
 import { createContent, updateContent } from '../actions/contentAction'
@@ -59,6 +60,7 @@ function EditorInner({
   const [savedSubcategory, setSavedSubcategory] = useState<string | undefined>()
   const [pdfImporting, setPdfImporting]     = useState(false)
   const [pdfImportError, setPdfImportError] = useState<string | null>(null)
+  const [pdfProgress, setPdfProgress]       = useState<string>('')
   const [isPublished,    setIsPublished]    = useState<boolean>(initialIsPublished ?? true)
   const [publishState,   setPublishState]  = useState<'idle' | 'toggling'>('idle')
   const exportRef   = useRef<HTMLDivElement>(null)
@@ -180,32 +182,34 @@ function EditorInner({
           onSaved?.(newId)
         }
       } else {
-        await Promise.all([
-          dispatch(updateContent({ id: docId, body: { name, category, subcategory } })).unwrap(),
-          ContentService.savePages(docId, pages as object[]),
-        ])
+        await ContentService.saveAll(docId, {
+          name,
+          category,
+          subcategory,
+          pages: pages as object[],
+        })
         if (category)    setSavedCategory(category)
         if (subcategory) setSavedSubcategory(subcategory)
       }
 
+      setSaveState('saved')
+      setTimeout(() => setSaveState('idle'), 2500)
+
       if (savedId && pages.length > 0) {
-        try {
-          const blob = await generateCoverImage()
-          if (blob) {
+        generateCoverImage()
+          .then(async (blob) => {
+            if (!blob || !savedId) return
             const file = new File([blob], `cover-${savedId}.png`, { type: 'image/png' })
             const uploadRes = await mediaApi.upload(file)
             const url = uploadRes?.data?.url
             if (url) {
               await dispatch(updateContent({ id: savedId, body: { coverImageUrl: url } })).unwrap()
             }
-          }
-        } catch {
-          // Cover generation is non-critical — don't fail the save
-        }
+          })
+          .catch(() => {
+            // Cover generation is non-critical — silently ignore
+          })
       }
-
-      setSaveState('saved')
-      setTimeout(() => setSaveState('idle'), 2500)
     } catch (e: any) {
       setSaveState('error')
       setSaveError(e.message ?? 'Save failed')
@@ -222,12 +226,26 @@ function EditorInner({
 
     setPdfImporting(true)
     setPdfImportError(null)
+    setPdfProgress('Uploading PDF…')
     try {
-      const res = await pdfApi.importPdf(file)
+      const res = await pdfApi.importPdf(file, (status: PdfJobStatus) => {
+        if (status.status === 'processing') {
+          const pct = status.progress ?? 0
+          setPdfProgress(
+            pct > 0
+              ? `Processing… ${pct}%`
+              : status.message || 'Processing…'
+          )
+        } else if (status.status === 'pending') {
+          setPdfProgress('Queued for processing…')
+        }
+      })
+
       const importedPages: Page[] = res.data?.pages ?? []
       if (!importedPages.length) throw new Error('No pages returned from server')
 
-      // Register extracted embedded fonts via @font-face so Konva text uses them
+      setPdfProgress(`Loading ${importedPages.length} pages…`)
+
       const fonts = res.data?.fonts ?? []
       if (fonts.length) {
         console.log('[PDF Import] Detected fonts:', fonts.map((f: { name: string; style: string; embeddedFile?: string }) =>
@@ -235,6 +253,8 @@ function EditorInner({
         ).join(', '))
 
         const loadedFaces = new Set<string>()
+        const fontPromises: Promise<void>[] = []
+
         for (const font of fonts) {
           if (!font.embeddedFile) continue
 
@@ -243,20 +263,23 @@ function EditorInner({
           const weight = (font.bold || /bold|black|heavy|semibold/i.test(font.style || '')) ? '700' : '400'
           const cacheKey = `${family}|${style}|${weight}|${font.embeddedFile}`
           if (loadedFaces.has(cacheKey)) continue
+          loadedFaces.add(cacheKey)
 
-          try {
-            const fontFace = new FontFace(family, `url(${font.embeddedFile})`, {
-              style,
-              weight,
-            })
-            const loaded = await fontFace.load()
-            document.fonts.add(loaded)
-            loadedFaces.add(cacheKey)
-            console.log(`[PDF Import] Loaded font: ${family} (${weight} ${style})`)
-          } catch (fontErr) {
-            console.warn(`[PDF Import] Could not load font ${font.name}:`, fontErr)
-          }
+          fontPromises.push(
+            (async () => {
+              try {
+                const fontFace = new FontFace(family, `url(${font.embeddedFile})`, { style, weight })
+                const loaded = await fontFace.load()
+                document.fonts.add(loaded)
+                console.log(`[PDF Import] Loaded font: ${family} (${weight} ${style})`)
+              } catch (fontErr) {
+                console.warn(`[PDF Import] Could not load font ${font.name}:`, fontErr)
+              }
+            })()
+          )
         }
+
+        await Promise.allSettled(fontPromises)
       }
 
       loadPages(importedPages)
@@ -264,9 +287,10 @@ function EditorInner({
       const e = err as { response?: { data?: { message?: string } }; message?: string }
       const msg = e?.response?.data?.message ?? e?.message ?? 'PDF import failed'
       setPdfImportError(msg)
-      setTimeout(() => setPdfImportError(null), 5000)
+      setTimeout(() => setPdfImportError(null), 8000)
     } finally {
       setPdfImporting(false)
+      setPdfProgress('')
     }
   }
 
@@ -342,7 +366,7 @@ function EditorInner({
             {pdfImporting ? (
               <>
                 <img src={spinnerIcon} alt="Loading" className="animate-spin" width={12} height={12} />
-                Importing…
+                {pdfProgress || 'Importing…'}
               </>
             ) : (
               <>
