@@ -40,6 +40,14 @@ const ContentApi = {
   savePages: (id: string, pages: object[], svgContent?: string) =>
     Api.put<ApiData>(`/content/${id}/pages`, { pages, svgContent }),
 
+  saveAll: (id: string, body: {
+    name?: string
+    category?: string
+    subcategory?: string
+    pages: object[]
+    svgContent?: string
+  }) => Api.put<ApiData>(`/content/${id}/save-all`, body),
+
   publish: (id: string, isPublished: boolean) =>
     Api.patch<ApiData>(`/content/${id}/publish`, { isPublished }),
 

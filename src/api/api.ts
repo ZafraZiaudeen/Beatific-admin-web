@@ -57,6 +57,7 @@ export interface RequestOptions<T = unknown> {
   headers?: Record<string, string>
   publicApi?: boolean
   ignoreDuplicateCheck?: boolean
+  timeout?: number
 }
 
 export const request = async <TResponse, TBody = unknown>(
@@ -70,6 +71,7 @@ export const request = async <TResponse, TBody = unknown>(
     headers: additionalHeaders,
     publicApi = false,
     ignoreDuplicateCheck = false,
+    timeout,
   } = options
 
   const requestKey = `${method}:${url}:${JSON.stringify(params)}:${JSON.stringify(data)}`
@@ -85,6 +87,7 @@ export const request = async <TResponse, TBody = unknown>(
     params,
     data,
     headers: { ...additionalHeaders },
+    ...(timeout ? { timeout } : {}),
   }
 
   if (data instanceof FormData) {
