@@ -5,6 +5,7 @@ import SignInPage from './pages/sign-in.page'
 import SignUpPage from './pages/sign-up.page'
 import ForgotPasswordPage from './pages/forgot-password.page'
 import DashboardPage from './pages/dashboard.page'
+import CalendarPage from './pages/calendar.page'
 import ContentPage from './pages/content.page'
 import ContentEditorPage from './pages/content-editor.page'
 import PagesPage from './pages/pages.page'
@@ -39,6 +40,7 @@ function App() {
 
           <Route element={<AdminLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/content" element={<ContentPage />} />
             <Route path="/pages" element={<PagesPage />} />
             <Route path="/permissions" element={<PermissionsPage />} />
