@@ -4,7 +4,9 @@ import type { CalendarScheduleItem, CalendarRecurrence } from './types'
 export type CalendarSchedulePayload = {
   contentId: string
   mode: 'exact' | 'recurring'
+  visibilityMode?: 'date-only' | 'always-visible'
   exactDate?: string
+  exactEndDate?: string
   recurrence?: CalendarRecurrence
   slotLabel?: string
   startTime?: string

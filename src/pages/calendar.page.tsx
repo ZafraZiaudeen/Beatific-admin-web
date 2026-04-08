@@ -17,11 +17,17 @@ type FormState = CalendarSchedulePayload & {
 const SLOT_OPTIONS = ['Morning', 'Afternoon', 'Evening', 'Anytime']
 const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
 function defaultForm(): FormState {
   return {
     contentId: '',
     mode: 'exact',
+    visibilityMode: 'date-only',
     exactDate: '',
+    exactEndDate: '',
     slotLabel: 'Anytime',
     startTime: '',
     isActive: true,
@@ -40,7 +46,9 @@ function toPayload(form: FormState): CalendarSchedulePayload {
   return {
     contentId: form.contentId,
     mode: form.mode,
+    visibilityMode: form.mode === 'exact' ? (form.visibilityMode ?? 'date-only') : 'date-only',
     exactDate: form.mode === 'exact' ? form.exactDate || undefined : undefined,
+    exactEndDate: form.mode === 'exact' ? form.exactEndDate || undefined : undefined,
     recurrence: form.mode === 'recurring'
       ? {
           frequency: form.recurrence.frequency,
@@ -58,7 +66,13 @@ function toPayload(form: FormState): CalendarSchedulePayload {
 }
 
 function describeSchedule(item: CalendarScheduleItem) {
-  if (item.mode === 'exact') return item.exactDate ?? 'Exact date'
+  if (item.mode === 'exact') {
+    if (!item.exactDate) return 'Exact date'
+    if (item.exactEndDate && item.exactEndDate !== item.exactDate) {
+      return `${item.exactDate} to ${item.exactEndDate}`
+    }
+    return item.exactDate
+  }
   const recurrence = item.recurrence
   if (!recurrence) return 'Recurring'
   if (recurrence.frequency === 'daily') {
@@ -71,6 +85,11 @@ function describeSchedule(item: CalendarScheduleItem) {
   return recurrence.interval > 1
     ? `Every ${recurrence.interval} months on day ${recurrence.dayOfMonth}`
     : `Monthly on day ${recurrence.dayOfMonth}`
+}
+
+function getScheduleModeLabel(item: CalendarScheduleItem) {
+  if (item.mode !== 'exact') return 'Recurring'
+  return item.exactEndDate && item.exactEndDate !== item.exactDate ? 'Date Range' : 'Exact Date'
 }
 
 function ScheduleEditor({
@@ -104,7 +123,7 @@ function ScheduleEditor({
         <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
           <div>
             <h2 className="text-sm font-bold text-stone-900">{editing ? 'Edit Schedule' : 'New Schedule'}</h2>
-            <p className="text-xs text-stone-400 mt-1">Assign published content to exact dates or recurring calendar rules.</p>
+            <p className="text-xs text-stone-400 mt-1">Assign published content to exact dates, date ranges, or recurring calendar rules.</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-stone-100 text-stone-400 hover:text-stone-700">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -137,7 +156,7 @@ function ScheduleEditor({
                   onChange={(e) => setForm((prev) => ({ ...prev, mode: e.target.value as 'exact' | 'recurring' }))}
                   className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                 >
-                  <option value="exact">Exact date</option>
+                  <option value="exact">Exact date or range</option>
                   <option value="recurring">Recurring</option>
                 </select>
               </label>
@@ -156,15 +175,68 @@ function ScheduleEditor({
             </div>
 
             {form.mode === 'exact' ? (
-              <label className="block">
-                <span className="text-xs font-semibold text-stone-700">Exact Date</span>
-                <input
-                  type="date"
-                  value={form.exactDate ?? ''}
-                  onChange={(e) => setForm((prev) => ({ ...prev, exactDate: e.target.value }))}
-                  className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
-                />
-              </label>
+              <>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <label className="block">
+                    <span className="text-xs font-semibold text-stone-700">Start Date</span>
+                    <input
+                      type="date"
+                      value={form.exactDate ?? ''}
+                      onChange={(e) => setForm((prev) => ({ ...prev, exactDate: e.target.value }))}
+                      className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-semibold text-stone-700">End Date</span>
+                    <input
+                      type="date"
+                      value={form.exactEndDate ?? ''}
+                      min={form.exactDate || undefined}
+                      onChange={(e) => setForm((prev) => ({ ...prev, exactEndDate: e.target.value }))}
+                      className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
+                    />
+                    <p className="mt-1 text-[11px] text-stone-400">Leave blank to schedule just one day.</p>
+                  </label>
+                </div>
+                <div className="rounded-2xl border border-stone-200 bg-stone-50/60 p-4 space-y-3">
+                  <div>
+                    <span className="text-xs font-semibold text-stone-700">Journal Visibility</span>
+                    <p className="mt-1 text-xs text-stone-500">
+                      Choose whether this dated journal stays visible in normal journal shelves outside its scheduled date window.
+                    </p>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setForm((prev) => ({ ...prev, visibilityMode: 'date-only' }))}
+                      className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
+                        (form.visibilityMode ?? 'date-only') === 'date-only'
+                          ? 'border-stone-900 bg-stone-900 text-white'
+                          : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300'
+                      }`}
+                    >
+                      <div className="text-xs font-semibold">Date only</div>
+                      <div className={`mt-1 text-xs ${(form.visibilityMode ?? 'date-only') === 'date-only' ? 'text-stone-200' : 'text-stone-500'}`}>
+                        Show it in calendar surfaces and in normal journal cards only during its scheduled date range.
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm((prev) => ({ ...prev, visibilityMode: 'always-visible' }))}
+                      className={`rounded-2xl border px-4 py-3 text-left transition-colors ${
+                        form.visibilityMode === 'always-visible'
+                          ? 'border-sky-600 bg-sky-600 text-white'
+                          : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300'
+                      }`}
+                    >
+                      <div className="text-xs font-semibold">Always visible</div>
+                      <div className={`mt-1 text-xs ${form.visibilityMode === 'always-visible' ? 'text-sky-100' : 'text-stone-500'}`}>
+                        Also keep it visible in normal journal shelves before and after the scheduled date range.
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </>
             ) : (
               <div className="rounded-2xl border border-stone-200 p-4 space-y-4 bg-stone-50/50">
                 <div className="grid sm:grid-cols-2 gap-4">
@@ -274,6 +346,10 @@ function ScheduleEditor({
                     />
                   </label>
                 </div>
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Recurring schedules always stay date-only in normal journal shelves to avoid clutter across many dates.
+                </div>
               </div>
             )}
 
@@ -358,6 +434,7 @@ export default function CalendarPage() {
   const [schedules, setSchedules] = useState<CalendarScheduleItem[]>([])
   const [contentItems, setContentItems] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletingScheduleId, setDeletingScheduleId] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<CalendarScheduleItem | null>(null)
   const [form, setForm] = useState<FormState>(defaultForm())
@@ -371,8 +448,11 @@ export default function CalendarPage() {
     [contentItems]
   )
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (options?: { showLoader?: boolean }) => {
+    const showLoader = options?.showLoader ?? true
+    if (showLoader) {
+      setLoading(true)
+    }
     try {
       const [scheduleRes, contentRes] = await Promise.all([
         CalendarScheduleApi.list(),
@@ -380,10 +460,12 @@ export default function CalendarPage() {
       ])
       setSchedules(scheduleRes.data ?? [])
       setContentItems(contentRes.data ?? [])
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to load calendar schedules')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to load calendar schedules'))
     } finally {
-      setLoading(false)
+      if (showLoader) {
+        setLoading(false)
+      }
     }
   }, [])
 
@@ -404,7 +486,9 @@ export default function CalendarPage() {
     setForm({
       contentId: schedule.contentId,
       mode: schedule.mode,
+      visibilityMode: schedule.visibilityMode ?? 'date-only',
       exactDate: schedule.exactDate ?? '',
+      exactEndDate: schedule.exactEndDate ?? '',
       slotLabel: schedule.slotLabel ?? 'Anytime',
       startTime: schedule.startTime ?? '',
       isActive: schedule.isActive,
@@ -428,8 +512,8 @@ export default function CalendarPage() {
     try {
       const res = await CalendarScheduleApi.preview(toPayload(form))
       setPreviewDates(res.data ?? [])
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to preview schedule')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to preview schedule'))
     } finally {
       setPreviewing(false)
     }
@@ -446,8 +530,8 @@ export default function CalendarPage() {
       }
       setModalOpen(false)
       await load()
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to save schedule')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to save schedule'))
     } finally {
       setSaving(false)
     }
@@ -455,11 +539,16 @@ export default function CalendarPage() {
 
   const handleDelete = async (schedule: CalendarScheduleItem) => {
     if (!window.confirm(`Delete schedule for "${schedule.content?.name ?? 'this content'}"? Untouched future journals will be removed.`)) return
+    setDeletingScheduleId(schedule._id)
+    setError(null)
     try {
       await CalendarScheduleApi.delete(schedule._id)
-      await load()
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to delete schedule')
+      setSchedules((current) => current.filter((item) => item._id !== schedule._id))
+      void load({ showLoader: false })
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to delete schedule'))
+    } finally {
+      setDeletingScheduleId(null)
     }
   }
 
@@ -470,7 +559,7 @@ export default function CalendarPage() {
           <div>
             <h1 className="text-xl font-semibold text-stone-900 tracking-tight">Calendar Scheduling</h1>
             <p className="text-xs text-stone-400 mt-0.5">
-              Assign published planner content to exact dates and rolling recurring schedules.
+              Assign published planner content to exact dates, multi-day ranges, and rolling recurring schedules.
             </p>
           </div>
           <button
@@ -508,7 +597,7 @@ export default function CalendarPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                      {schedule.mode === 'exact' ? 'Exact Date' : 'Recurring'}
+                      {getScheduleModeLabel(schedule)}
                     </p>
                     <h3 className="mt-1 text-base font-semibold text-stone-900 truncate">
                       {schedule.content?.name ?? 'Unknown content'}
@@ -540,6 +629,13 @@ export default function CalendarPage() {
                       {schedule.content.itemType}
                     </span>
                   )}
+                  <span className={`px-2 py-1 rounded-full text-[11px] ${
+                    (schedule.visibilityMode ?? 'date-only') === 'always-visible'
+                      ? 'bg-sky-50 text-sky-700'
+                      : 'bg-amber-50 text-amber-700'
+                  }`}>
+                    {(schedule.visibilityMode ?? 'date-only') === 'always-visible' ? 'Always visible' : 'Date only'}
+                  </span>
                 </div>
 
                 <div className="mt-4">
@@ -557,8 +653,12 @@ export default function CalendarPage() {
                   <button onClick={() => openEdit(schedule)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-700 hover:bg-sky-50">
                     Edit
                   </button>
-                  <button onClick={() => handleDelete(schedule)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50">
-                    Delete
+                  <button
+                    onClick={() => handleDelete(schedule)}
+                    disabled={deletingScheduleId === schedule._id}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {deletingScheduleId === schedule._id ? 'Deleting...' : 'Delete'}
                   </button>
                 </div>
               </div>

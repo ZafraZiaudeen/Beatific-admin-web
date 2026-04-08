@@ -304,11 +304,15 @@ export interface CalendarRecurrence {
   endDate?: string
 }
 
+export type CalendarVisibilityMode = 'date-only' | 'always-visible'
+
 export interface CalendarScheduleItem {
   _id: string
   contentId: string
   mode: 'exact' | 'recurring'
+  visibilityMode?: CalendarVisibilityMode
   exactDate?: string
+  exactEndDate?: string
   recurrence?: CalendarRecurrence
   slotLabel?: string
   startTime?: string
