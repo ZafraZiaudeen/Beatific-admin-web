@@ -294,3 +294,38 @@ export interface DashboardOverviewEnvelope {
   success: boolean
   data: DashboardOverview
 }
+
+export interface CalendarRecurrence {
+  frequency: 'daily' | 'weekly' | 'monthly'
+  interval: number
+  weekdays?: string[]
+  dayOfMonth?: number
+  startDate: string
+  endDate?: string
+}
+
+export type CalendarVisibilityMode = 'date-only' | 'always-visible'
+
+export interface CalendarScheduleItem {
+  _id: string
+  contentId: string
+  mode: 'exact' | 'recurring'
+  visibilityMode?: CalendarVisibilityMode
+  exactDate?: string
+  exactEndDate?: string
+  recurrence?: CalendarRecurrence
+  slotLabel?: string
+  startTime?: string
+  isActive: boolean
+  revision: number
+  createdBy?: string
+  createdAt: string
+  updatedAt: string
+  upcomingDates?: string[]
+  content?: {
+    _id: string
+    name: string
+    itemType: string
+    coverImageUrl?: string
+  } | null
+}

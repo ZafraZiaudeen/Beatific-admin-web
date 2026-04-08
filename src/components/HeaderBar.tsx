@@ -8,6 +8,7 @@ type Props = {
 
 function getLabel(pathname: string, searchParams: URLSearchParams): string {
   if (pathname === '/dashboard')           return 'Overview'
+  if (pathname === '/calendar')            return 'Calendar'
   if (pathname.startsWith('/content/editor')) return 'Editor'
   if (pathname === '/content') {
     const type = searchParams.get('type')
